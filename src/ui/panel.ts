@@ -28,6 +28,7 @@ import { parseSysex, voiceAlgorithm } from './sysex';
 import { loadBanks, saveBanks } from './storage';
 
 const PROGRAM_BUTTON_COUNT = BANK_VOICE_COUNT;
+const ENGINE_TYPES: readonly EngineType[] = [ENGINE_DX7, ENGINE_DX7S];
 const KEYBOARD_OCTAVES = 2;
 const MAX_VOLUME = 100;
 const Q16_ONE = 65536;
@@ -79,44 +80,55 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   const engineRow = document.createElement('div');
   engineRow.className = 'control-row source-row';
 
-  const engineLabel = document.createElement('label');
-  engineLabel.className = 'field-label';
-  engineLabel.textContent = 'ENGINE';
-  engineLabel.htmlFor = 'engine-select';
+  const engineButton = document.createElement('button');
+  engineButton.type = 'button';
+  engineButton.className = 'button engine-button';
+  engineButton.textContent = 'ENGINE';
+  engineButton.setAttribute('aria-label', 'cycle engine personality');
 
-  const engineSelect = document.createElement('select');
-  engineSelect.id = 'engine-select';
-  engineSelect.className = 'engine-select';
-  engineSelect.setAttribute('aria-label', 'engine personality');
-
-  const engineOptionDx7 = document.createElement('option');
-  engineOptionDx7.value = String(ENGINE_DX7);
-  engineOptionDx7.textContent = 'DX7';
-
-  const engineOptionDx7s = document.createElement('option');
-  engineOptionDx7s.value = String(ENGINE_DX7S);
-  engineOptionDx7s.textContent = 'DX7S';
-
-  engineSelect.append(engineOptionDx7, engineOptionDx7s);
-
-  engineSelect.addEventListener('change', () => {
-    const newType = Number(engineSelect.value) as EngineType;
-    if (newType === engineType) {
-      return;
-    }
-    engineType = newType;
+  engineButton.addEventListener('click', () => {
+    const index = ENGINE_TYPES.indexOf(engineType);
+    const next = ENGINE_TYPES[(index + 1) % ENGINE_TYPES.length] ?? ENGINE_DX7;
+    engineType = next;
     engine.setEngineType(engineType);
+    renderPatchInfo();
   });
 
-  const bankLabel = document.createElement('label');
+  const bankLabel = document.createElement('span');
   bankLabel.className = 'field-label bank-label';
   bankLabel.textContent = 'BANK';
-  bankLabel.htmlFor = 'bank-select';
 
-  const bankSelect = document.createElement('select');
-  bankSelect.id = 'bank-select';
-  bankSelect.className = 'bank-select';
-  bankSelect.setAttribute('aria-label', 'loaded bank');
+  const bankPrevButton = document.createElement('button');
+  bankPrevButton.type = 'button';
+  bankPrevButton.className = 'button button-small';
+  bankPrevButton.textContent = '−';
+  bankPrevButton.setAttribute('aria-label', 'previous bank');
+
+  const bankName = document.createElement('span');
+  bankName.className = 'bank-name';
+  bankName.setAttribute('aria-live', 'polite');
+
+  const bankNextButton = document.createElement('button');
+  bankNextButton.type = 'button';
+  bankNextButton.className = 'button button-small';
+  bankNextButton.textContent = '+';
+  bankNextButton.setAttribute('aria-label', 'next bank');
+
+  const programLabel = document.createElement('span');
+  programLabel.className = 'field-label program-label';
+  programLabel.textContent = 'PRG';
+
+  const programPrevButton = document.createElement('button');
+  programPrevButton.type = 'button';
+  programPrevButton.className = 'button button-small';
+  programPrevButton.textContent = '−';
+  programPrevButton.setAttribute('aria-label', 'previous program');
+
+  const programNextButton = document.createElement('button');
+  programNextButton.type = 'button';
+  programNextButton.className = 'button button-small';
+  programNextButton.textContent = '+';
+  programNextButton.setAttribute('aria-label', 'next program');
 
   const loadButton = document.createElement('button');
   loadButton.type = 'button';
@@ -135,13 +147,17 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   removeButton.textContent = 'Remove bank';
 
   engineRow.append(
-    engineLabel,
-    engineSelect,
+    engineButton,
     bankLabel,
-    bankSelect,
+    bankPrevButton,
+    bankName,
+    bankNextButton,
     loadButton,
     removeButton,
     fileInput,
+    programLabel,
+    programPrevButton,
+    programNextButton,
   );
 
   const midiRow = document.createElement('div');
@@ -168,41 +184,36 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
 
   midiRow.append(midiLabel, midiConnect, midiSelect, midiStatus);
 
-  const transportRow = document.createElement('div');
-  transportRow.className = 'control-row transport-row';
-
-  const previousButton = document.createElement('button');
-  previousButton.type = 'button';
-  previousButton.className = 'button button-transport';
-  previousButton.textContent = '‹ Previous';
-  previousButton.setAttribute('aria-label', 'previous program');
-
-  const position = document.createElement('div');
-  position.className = 'position';
-  position.setAttribute('aria-live', 'polite');
-
-  const nextButton = document.createElement('button');
-  nextButton.type = 'button';
-  nextButton.className = 'button button-transport';
-  nextButton.textContent = 'Next ›';
-  nextButton.setAttribute('aria-label', 'next program');
-
-  const volumeWrap = document.createElement('label');
+  const volumeWrap = document.createElement('div');
   volumeWrap.className = 'volume-wrap';
-  volumeWrap.textContent = 'VOLUME';
-  volumeWrap.htmlFor = 'volume';
 
-  const volumeInput = document.createElement('input');
-  volumeInput.id = 'volume';
-  volumeInput.type = 'range';
-  volumeInput.min = '0';
-  volumeInput.max = String(MAX_VOLUME);
-  volumeInput.step = '1';
-  volumeInput.value = String(volume);
-  volumeInput.className = 'volume';
-  volumeWrap.append(volumeInput);
+  const volumeLabel = document.createElement('span');
+  volumeLabel.className = 'field-label';
+  volumeLabel.textContent = 'VOLUME';
 
-  transportRow.append(previousButton, position, nextButton, volumeWrap);
+  const knob = document.createElement('div');
+  knob.className = 'knob';
+  knob.id = 'volume';
+  knob.tabIndex = 0;
+  knob.setAttribute('role', 'slider');
+  knob.setAttribute('aria-label', 'volume');
+  knob.setAttribute('aria-valuemin', '0');
+  knob.setAttribute('aria-valuemax', String(MAX_VOLUME));
+  knob.setAttribute('aria-valuenow', String(volume));
+
+  const knobDial = document.createElement('div');
+  knobDial.className = 'knob-dial';
+
+  const knobPointer = document.createElement('span');
+  knobPointer.className = 'knob-pointer';
+  knobDial.append(knobPointer);
+
+  const knobValue = document.createElement('span');
+  knobValue.className = 'knob-value';
+
+  knob.append(knobDial, knobValue);
+  volumeWrap.append(volumeLabel, knob);
+  engineRow.append(volumeWrap);
 
   const programGrid = document.createElement('div');
   programGrid.className = 'program-grid';
@@ -214,7 +225,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'program-button';
-    button.textContent = String(slot + 1).padStart(2, '0');
+    button.textContent = String(slot + 1);
     button.addEventListener('click', () => {
       selectProgram(slot);
     });
@@ -262,23 +273,21 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   const attribution = document.createElement('div');
   attribution.className = 'attribution';
   attribution.innerHTML =
-    'Engine: <a href="https://github.com/cmatsuoka/slopsix" rel="noreferrer" target="_blank">libslopsix</a> (MIT)';
+    'Using <a href="https://github.com/cmatsuoka/slopsix" rel="noreferrer" target="_blank">libslopsix</a> (MIT)';
 
   controls.append(
     engineRow,
     midiRow,
-    transportRow,
     programGrid,
     keyboardPanel,
     status,
-    attribution,
   );
 
   const caseBottom = document.createElement('div');
   caseBottom.className = 'case-bottom';
 
   machine.append(caseTop, controls, caseBottom);
-  root.append(machine);
+  root.append(machine, attribution);
 
   const keyElements = new Map<number, HTMLButtonElement>();
   /** Notes held by the on-screen and computer keyboards. */
@@ -306,22 +315,17 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     }
     banks = banks.map((entry) => (entry.id === bank.id ? reparsed : entry));
     if (reparsed.voices.length !== bank.voices.length) {
-      refreshBankSelect();
+      refreshBankControls();
     }
     return reparsed;
   }
 
-  function refreshBankSelect(): void {
-    bankSelect.replaceChildren();
-    for (const bank of banks) {
-      const option = document.createElement('option');
-      option.value = bank.id;
-      option.textContent = `${bank.name} (${bank.voices.length})`;
-      bankSelect.append(option);
-    }
-    bankSelect.value = bankId;
-
+  function refreshBankControls(): void {
     const bank = currentBank();
+    bankName.textContent = `${bank.name} (${bank.voices.length})`;
+    bankName.title = bank.name;
+    bankPrevButton.disabled = banks.length < 2;
+    bankNextButton.disabled = banks.length < 2;
     removeButton.disabled = bank.builtin === true || banks.length <= 1;
   }
 
@@ -331,7 +335,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
       const voice = bank.voices[slot];
       button.hidden = voice === undefined;
       button.disabled = voice === undefined;
-      button.textContent = String(slot + 1).padStart(2, '0');
+      button.textContent = String(slot + 1);
       button.title = voice === undefined ? '' : voice.name;
       button.setAttribute(
         'aria-label',
@@ -344,12 +348,11 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     });
 
     const voice = currentVoice();
-    position.textContent = `${String(program + 1).padStart(2, '0')} / ${String(bank.voices.length).padStart(2, '0')}`;
     display.setProgram(voice === null ? null : program + 1);
     cancelLcdFlash();
     renderPatchInfo();
-    previousButton.disabled = bank.voices.length < 2;
-    nextButton.disabled = bank.voices.length < 2;
+    programPrevButton.disabled = bank.voices.length < 2;
+    programNextButton.disabled = bank.voices.length < 2;
   }
 
   /**
@@ -421,14 +424,29 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     }
     bankId = bank.id;
     program = Math.max(0, Math.min(bank.voices.length - 1, program));
-    refreshBankSelect();
+    refreshBankControls();
     refreshPrograms();
     selectProgram(program);
   }
 
+  function stepBank(delta: number): void {
+    if (banks.length < 2) {
+      return;
+    }
+    const index = banks.findIndex((entry) => entry.id === bankId);
+    const bank = banks[(index + delta + banks.length) % banks.length];
+    if (bank !== undefined) {
+      selectBank(bank.id);
+    }
+  }
+
   function setVolume(percent: number): void {
     volume = Math.max(0, Math.min(MAX_VOLUME, Math.round(percent)));
-    volumeInput.value = String(volume);
+    const angle = -135 + (volume / MAX_VOLUME) * 270;
+    knobDial.style.setProperty('--knob-angle', `${angle}deg`);
+    knobValue.textContent = String(volume);
+    knob.setAttribute('aria-valuenow', String(volume));
+    knob.setAttribute('aria-valuetext', `${volume}%`);
     engine.setOutputGain(Math.round((volume / MAX_VOLUME) * Q16_ONE));
   }
 
@@ -445,7 +463,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     }
     bankId = fallback.id;
     program = 0;
-    refreshBankSelect();
+    refreshBankControls();
     refreshPrograms();
     selectProgram(0);
     showNotice(`Removed ${bank.name}`);
@@ -493,7 +511,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
 
     if (added > 0) {
       saveBanks(banks);
-      refreshBankSelect();
+      refreshBankControls();
       flashLcdLine2(checksumError ? LCD_CHECKSUM_ERROR : LCD_MIDI_RECEIVED);
       showNotice(
         added === 1
@@ -704,7 +722,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
       onNoteOff: (note) => releaseNote(note),
       onAllNotesOff: allNotesOff,
     },
-    4,
+    3,
   );
 
 
@@ -770,8 +788,11 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     midiStatus.textContent = 'Web MIDI is not available in this browser';
   }
 
-  bankSelect.addEventListener('change', () => {
-    selectBank(bankSelect.value);
+  bankPrevButton.addEventListener('click', () => {
+    stepBank(-1);
+  });
+  bankNextButton.addEventListener('click', () => {
+    stepBank(1);
   });
   loadButton.addEventListener('click', () => {
     fileInput.click();
@@ -797,16 +818,77 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     fileInput.value = '';
   });
   removeButton.addEventListener('click', removeCurrentBank);
-  previousButton.addEventListener('click', () => {
+  programPrevButton.addEventListener('click', () => {
     const bank = currentBank();
     selectProgram((program - 1 + bank.voices.length) % bank.voices.length);
   });
-  nextButton.addEventListener('click', () => {
+  programNextButton.addEventListener('click', () => {
     const bank = currentBank();
     selectProgram((program + 1) % bank.voices.length);
   });
-  volumeInput.addEventListener('input', () => {
-    setVolume(Number(volumeInput.value));
+  let dragStartY = 0;
+  let dragStartVolume = 0;
+  knob.addEventListener('pointerdown', (event) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) {
+      return;
+    }
+    event.preventDefault();
+    knob.setPointerCapture(event.pointerId);
+    knob.classList.add('dragging');
+    dragStartY = event.clientY;
+    dragStartVolume = volume;
+  });
+  knob.addEventListener('pointermove', (event) => {
+    if (!knob.hasPointerCapture(event.pointerId)) {
+      return;
+    }
+    event.preventDefault();
+    const delta = ((dragStartY - event.clientY) / 160) * MAX_VOLUME;
+    setVolume(dragStartVolume + delta);
+  });
+  const endKnobDrag = (event: PointerEvent): void => {
+    if (!knob.hasPointerCapture(event.pointerId)) {
+      return;
+    }
+    knob.releasePointerCapture(event.pointerId);
+    knob.classList.remove('dragging');
+  };
+  knob.addEventListener('pointerup', endKnobDrag);
+  knob.addEventListener('pointercancel', endKnobDrag);
+  knob.addEventListener(
+    'wheel',
+    (event) => {
+      event.preventDefault();
+      setVolume(volume + (event.deltaY < 0 ? 1 : -1));
+    },
+    { passive: false },
+  );
+  knob.addEventListener('keydown', (event) => {
+    switch (event.key) {
+      case 'ArrowUp':
+      case 'ArrowRight':
+        setVolume(volume + 1);
+        break;
+      case 'ArrowDown':
+      case 'ArrowLeft':
+        setVolume(volume - 1);
+        break;
+      case 'PageUp':
+        setVolume(volume + 10);
+        break;
+      case 'PageDown':
+        setVolume(volume - 10);
+        break;
+      case 'Home':
+        setVolume(0);
+        break;
+      case 'End':
+        setVolume(MAX_VOLUME);
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
   });
   octaveDown.addEventListener('click', () => {
     allNotesOff();
@@ -836,7 +918,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     }
   });
 
-  refreshBankSelect();
+  refreshBankControls();
   refreshPrograms();
   buildPiano();
   setVolume(volume);
@@ -848,9 +930,8 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
 
   engine.onReady((version, _dumpSize, readyEngineType) => {
     engineType = readyEngineType;
-    engineSelect.value = String(readyEngineType);
     renderPatchInfo();
-    attribution.innerHTML = `Engine: <a href="https://github.com/cmatsuoka/slopsix" rel="noreferrer" target="_blank">libslopsix</a> ${formatVersion(version)} (MIT)`;
+    attribution.innerHTML = `Using <a href="https://github.com/cmatsuoka/slopsix" rel="noreferrer" target="_blank">libslopsix</a> ${formatVersion(version)} (MIT)`;
     engine.configureMidiControllers();
     const voice = currentVoice();
     if (voice !== null) {
