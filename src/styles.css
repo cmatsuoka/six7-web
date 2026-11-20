@@ -498,41 +498,30 @@ body {
 }
 
 .program-button {
-  height: 34px;
-  border: 1px solid #1c2414;
+  height: 32px;
+  border: 1px solid #0c0d0b;
   border-radius: 3px;
-  background: #00a885;
-  color: #fff;
+  background: linear-gradient(180deg, #4c4b47, #2e2d2a);
+  color: #cfd2ca;
   font-family: ui-monospace, monospace;
   font-size: 12px;
-  font-weight: 700;
-  text-align: left;
-  padding: 0 7px;
   cursor: pointer;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.45),
-    0 1px 2px rgba(0, 0, 0, 0.5);
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 .program-button:hover {
-  background: #00bf98;
+  background: linear-gradient(180deg, #5a5954, #383733);
 }
 
 .program-button.selected {
-  border-color: #b8ffe9;
-  background: #00d1a4;
-  color: #fff;
+  border-color: #e7b24b;
+  background: linear-gradient(180deg, #8c6a2e, #5f451b);
+  color: #fff3d6;
   box-shadow:
-    inset 0 0 0 1px rgba(210, 255, 240, 0.5),
-    0 0 9px rgba(0, 209, 164, 0.45);
-}
-
-.program-button:active {
-  transform: translateY(1px);
-  background: #009878;
-  box-shadow:
-    inset 0 2px 5px rgba(0, 0, 0, 0.45),
-    0 1px 0 rgba(255, 255, 255, 0.08);
+    inset 0 0 0 1px rgba(255, 215, 120, 0.28),
+    0 0 9px rgba(231, 178, 75, 0.3);
 }
 
 /* ------------------------------------------------------------- the keyboard */

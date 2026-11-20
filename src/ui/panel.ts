@@ -225,7 +225,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'program-button';
-    button.textContent = String(slot + 1);
+    button.textContent = String(slot + 1).padStart(2, '0');
     button.addEventListener('click', () => {
       selectProgram(slot);
     });
@@ -335,7 +335,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
       const voice = bank.voices[slot];
       button.hidden = voice === undefined;
       button.disabled = voice === undefined;
-      button.textContent = String(slot + 1);
+      button.textContent = String(slot + 1).padStart(2, '0');
       button.title = voice === undefined ? '' : voice.name;
       button.setAttribute(
         'aria-label',
