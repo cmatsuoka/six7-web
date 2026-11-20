@@ -1,0 +1,50 @@
+# Six7
+
+Six7 is a browser-based synthesizer built as a test interface for
+[libslopsix](https://github.com/cmatsuoka/slopsix), a dependency-free,
+integer-only, fixed-point FM engine compiled to WebAssembly. Itplays
+standard DX7 programs and an experimental DX7S mode is included.
+
+## Running
+
+```sh
+npm install
+npm run build:wasm         # fetch/copy and compile libslopsix
+npm run build:wasm:debug   # same, with runtime assertions
+npm run dev                # Vite dev server
+```
+
+For another machine on the LAN, the AudioWorklet needs a secure
+context, so use the HTTPS dev server:
+
+```sh
+npm run dev:secure
+```
+
+## SYSEX formats
+
+- 32-voice bulk dump: `F0 43 00 09 20 00`, 4096 data bytes
+  (32 × 128 packed voices), checksum, `F7`.
+- Single voice dump: `F0 43 00 00 01 1B`, 155 data bytes, checksum, `F7`.
+
+The packed voice is unpacked into the engine's 156-byte dump, and the patch
+name comes from the voice data itself (offsets 145…154 of the unpacked
+form). The checksum is checked; a mismatch shows `CHECK SUM ERROR!` on the
+LCD but does not corrupt the data. A file with no readable dump shows
+`MIDI DATA ERROR!`, and a bank that was read shows ` MIDI RECEIVED`, the
+same transient messages the firmware uses.
+
+## Build details
+
+```sh
+npm run build        # production build (runs build:wasm first)
+npm run typecheck    # tsc --noEmit
+npm run test:sysex   # node check of the SYSEX parser
+npm run smoke        # node smoke test of the built engine
+```
+
+`scripts/build-wasm.sh` uses the sibling checkout `../slopsix` when it is
+present and otherwise fetches a pinned commit. The sources the build
+compiles are a copy in `vendor/libslopsix`; the source tree is never
+written to. Point `SLOPSIX_SOURCE` at another checkout to build that. The
+library is never patched here.
