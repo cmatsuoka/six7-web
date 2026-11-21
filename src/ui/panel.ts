@@ -1,3 +1,4 @@
+import logoUrl from '../../six-seven.svg';
 import type { Six7Engine } from '../audio/engine';
 import {
   BANK_VOICE_COUNT,
@@ -184,7 +185,17 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
 
   const brand = document.createElement('div');
   brand.className = 'brand';
-  brand.innerHTML = '<span class="brand-mark">six7</span><span class="brand-sub">FM SYNTHESIZER</span>';
+
+  const brandLogo = document.createElement('img');
+  brandLogo.className = 'brand-logo';
+  brandLogo.src = logoUrl;
+  brandLogo.alt = 'Six7';
+
+  const brandSub = document.createElement('span');
+  brandSub.className = 'brand-sub';
+  brandSub.textContent = 'FM SYNTHESIZER';
+
+  brand.append(brandLogo, brandSub);
 
   const displayBezel = document.createElement('div');
   displayBezel.className = 'display-bezel';
@@ -378,7 +389,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   const attribution = document.createElement('div');
   attribution.className = 'attribution';
   attribution.innerHTML =
-    'Using <a href="https://github.com/cmatsuoka/slopsix" rel="noreferrer" target="_blank">libslopsix</a> (MIT)';
+    'Using <a href="https://github.com/cmatsuoka/slopsix" rel="noreferrer" target="_blank">libslopsix</a>';
 
   controls.append(
     engineRow,
@@ -990,7 +1001,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   engine.onReady((version, _dumpSize, readyEngineType) => {
     engineType = readyEngineType;
     renderPatchInfo();
-    attribution.innerHTML = `Using <a href="https://github.com/cmatsuoka/slopsix" rel="noreferrer" target="_blank">libslopsix</a> ${formatVersion(version)} (MIT)`;
+    attribution.innerHTML = `Using <a href="https://github.com/cmatsuoka/slopsix" rel="noreferrer" target="_blank">libslopsix</a> ${formatVersion(version)}`;
     engine.configureMidiControllers();
     const voice = currentVoice();
     if (voice !== null) {
