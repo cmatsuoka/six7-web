@@ -25,7 +25,7 @@ import {
 import { createDisplay } from './display';
 import { MidiInput, type MidiDevice } from '../audio/midi';
 import { parseSysex, voiceAlgorithm } from './sysex';
-import { loadBanks, saveBanks } from './storage';
+import { loadBanks, saveBanks, loadSensitivity, scheduleSensitivitySave, cancelSensitivitySave } from './storage';
 
 const PROGRAM_BUTTON_COUNT = BANK_VOICE_COUNT;
 const ENGINE_TYPES: readonly EngineType[] = [ENGINE_DX7, ENGINE_DX7S];
@@ -163,7 +163,11 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   let bankId = starter.id;
   let program = 0;
   let volume = 70;
-  let sensitivity = MAX_SENSITIVITY;
+  const savedSensitivity = loadSensitivity();
+  let sensitivity =
+    typeof savedSensitivity === 'number'
+      ? Math.max(0, Math.min(MAX_SENSITIVITY, savedSensitivity))
+      : MAX_SENSITIVITY;
   let messageTimer: ReturnType<typeof setTimeout> | null = null;
   let lcdTimer: ReturnType<typeof setTimeout> | null = null;
   let lcdLineOne = starter.name;
@@ -557,13 +561,15 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     sensitivityKnob.dial.style.setProperty('--knob-angle', `${angle}deg`);
     sensitivityKnob.element.setAttribute('aria-valuenow', String(sensitivity));
     sensitivityKnob.element.setAttribute('aria-valuetext', `${sensitivity}%`);
+    scheduleSensitivitySave(sensitivity);
   }
 
   function scaledVelocity(velocity: number): number {
     const input = Math.max(0, Math.min(127, Math.round(velocity)));
+    const normalized = (input * 100) / 127;
     const scaled =
-      127 - ((127 - input) * sensitivity) / MAX_SENSITIVITY;
-    return Math.max(0, Math.min(127, Math.round(scaled)));
+      100 - (100 - normalized) * (MAX_SENSITIVITY - sensitivity) / MAX_SENSITIVITY;
+    return Math.max(0, Math.min(100, Math.round(scaled)));
   }
 
   function removeCurrentBank(): void {
@@ -999,6 +1005,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   window.addEventListener('beforeunload', () => {
     keyboard.dispose();
     midi.disconnect();
+    cancelSensitivitySave();
   });
 
   return { showError, showNotice, handleFiles };

@@ -75,4 +75,72 @@ export function saveBanks(banks: readonly Bank[]): void {
   write(BANKS_KEY, JSON.stringify(stored));
 }
 
+const SETTINGS_KEY = 'six7.settings.v1';
+
+export interface StoredSettings {
+  sensitivity: number;
+}
+
+export function loadSensitivity(): number | null {
+  const raw = read(SETTINGS_KEY);
+  if (raw === null) {
+    return null;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (
+    typeof parsed !== 'object' ||
+    parsed === null ||
+    !('sensitivity' in parsed) ||
+    typeof (parsed as StoredSettings).sensitivity !== 'number'
+  ) {
+    return null;
+  }
+  return (parsed as StoredSettings).sensitivity;
+}
+
+let sensitivitySaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function scheduleSensitivitySave(value: number): void {
+  if (sensitivitySaveTimer !== null) {
+    clearTimeout(sensitivitySaveTimer);
+  }
+  sensitivitySaveTimer = setTimeout(() => {
+    sensitivitySaveTimer = null;
+    try {
+      const raw = read(SETTINGS_KEY);
+      let settings: StoredSettings = { sensitivity: value };
+      if (raw !== null) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (
+            typeof parsed === 'object' &&
+            parsed !== null &&
+            'sensitivity' in parsed
+          ) {
+            settings = parsed as StoredSettings;
+          }
+        } catch {
+          // Start fresh on malformed data.
+        }
+      }
+      settings.sensitivity = value;
+      write(SETTINGS_KEY, JSON.stringify(settings));
+    } catch {
+      // Nothing we can do.
+    }
+  }, 500);
+}
+
+export function cancelSensitivitySave(): void {
+  if (sensitivitySaveTimer !== null) {
+    clearTimeout(sensitivitySaveTimer);
+    sensitivitySaveTimer = null;
+  }
+}
+
 
