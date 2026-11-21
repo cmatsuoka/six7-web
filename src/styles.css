@@ -326,17 +326,6 @@ body {
   margin-left: 14px;
 }
 
-.bank-name {
-  flex: 0 1 170px;
-  min-width: 0;
-  max-width: 190px;
-  overflow: hidden;
-  color: #e4e6df;
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .bank-select {
   flex: 1 1 200px;
   min-width: 0;
@@ -412,15 +401,18 @@ body {
   font-size: 16px;
 }
 
-.volume-wrap {
+.knobs {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 16px;
   margin-left: auto;
-  color: #a9ada5;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.22em;
+}
+
+.knob-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
 }
 
 .knob {
@@ -471,15 +463,6 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.22),
     inset 0 -2px 4px rgba(0, 0, 0, 0.5),
     0 0 8px rgba(231, 178, 75, 0.4);
-}
-
-.knob-value {
-  color: #a9ada5;
-  font-family: ui-monospace, monospace;
-  font-size: 10px;
-  font-weight: 400;
-  letter-spacing: 0;
-  line-height: 1;
 }
 
 .program-grid {
@@ -671,7 +654,7 @@ body {
   grid-template-columns: repeat(8, minmax(0, 1fr));
 }
 
-.panel-host.compact .volume-wrap {
+.panel-host.compact .knobs {
   margin-left: 0;
 }
 

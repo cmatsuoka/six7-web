@@ -31,6 +31,7 @@ const PROGRAM_BUTTON_COUNT = BANK_VOICE_COUNT;
 const ENGINE_TYPES: readonly EngineType[] = [ENGINE_DX7, ENGINE_DX7S];
 const KEYBOARD_OCTAVES = 2;
 const MAX_VOLUME = 100;
+const MAX_SENSITIVITY = 100;
 const Q16_ONE = 65536;
 
 const LCD_INTERNAL_VOICE = 'INTERNAL VOICE';
@@ -44,12 +45,125 @@ export interface Panel {
   handleFiles(files: readonly File[]): void;
 }
 
+interface KnobOptions {
+  id: string;
+  label: string;
+  ariaLabel: string;
+  max: number;
+  getValue: () => number;
+  setValue: (value: number) => void;
+}
+
+interface KnobControl {
+  wrap: HTMLDivElement;
+  element: HTMLDivElement;
+  dial: HTMLDivElement;
+}
+
+function createKnob(options: KnobOptions): KnobControl {
+  const wrap = document.createElement('div');
+  wrap.className = 'knob-wrap';
+
+  const element = document.createElement('div');
+  element.className = 'knob';
+  element.id = options.id;
+  element.tabIndex = 0;
+  element.setAttribute('role', 'slider');
+  element.setAttribute('aria-label', options.ariaLabel);
+  element.setAttribute('aria-valuemin', '0');
+  element.setAttribute('aria-valuemax', String(options.max));
+  element.setAttribute('aria-valuenow', String(options.getValue()));
+
+  const dial = document.createElement('div');
+  dial.className = 'knob-dial';
+
+  const pointer = document.createElement('span');
+  pointer.className = 'knob-pointer';
+  dial.append(pointer);
+
+  const label = document.createElement('span');
+  label.className = 'field-label';
+  label.textContent = options.label;
+
+  element.append(dial);
+  wrap.append(element, label);
+
+  let dragStartY = 0;
+  let dragStartValue = 0;
+  element.addEventListener('pointerdown', (event) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) {
+      return;
+    }
+    event.preventDefault();
+    element.setPointerCapture(event.pointerId);
+    element.classList.add('dragging');
+    dragStartY = event.clientY;
+    dragStartValue = options.getValue();
+  });
+  element.addEventListener('pointermove', (event) => {
+    if (!element.hasPointerCapture(event.pointerId)) {
+      return;
+    }
+    event.preventDefault();
+    const delta = ((dragStartY - event.clientY) / 160) * options.max;
+    options.setValue(dragStartValue + delta);
+  });
+  const endDrag = (event: PointerEvent): void => {
+    if (!element.hasPointerCapture(event.pointerId)) {
+      return;
+    }
+    element.releasePointerCapture(event.pointerId);
+    element.classList.remove('dragging');
+  };
+  element.addEventListener('pointerup', endDrag);
+  element.addEventListener('pointercancel', endDrag);
+  element.addEventListener(
+    'wheel',
+    (event) => {
+      event.preventDefault();
+      options.setValue(options.getValue() + (event.deltaY < 0 ? 1 : -1));
+    },
+    { passive: false },
+  );
+  element.addEventListener('keydown', (event) => {
+    const value = options.getValue();
+    switch (event.key) {
+      case 'ArrowUp':
+      case 'ArrowRight':
+        options.setValue(value + 1);
+        break;
+      case 'ArrowDown':
+      case 'ArrowLeft':
+        options.setValue(value - 1);
+        break;
+      case 'PageUp':
+        options.setValue(value + 10);
+        break;
+      case 'PageDown':
+        options.setValue(value - 10);
+        break;
+      case 'Home':
+        options.setValue(0);
+        break;
+      case 'End':
+        options.setValue(options.max);
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+  });
+
+  return { wrap, element, dial };
+}
+
 export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   const starter = createStarterBank();
   let banks: Bank[] = [starter, ...loadBanks()];
   let bankId = starter.id;
   let program = 0;
   let volume = 70;
+  let sensitivity = MAX_SENSITIVITY;
   let messageTimer: ReturnType<typeof setTimeout> | null = null;
   let lcdTimer: ReturnType<typeof setTimeout> | null = null;
   let lcdLineOne = starter.name;
@@ -104,10 +218,6 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   bankPrevButton.textContent = '−';
   bankPrevButton.setAttribute('aria-label', 'previous bank');
 
-  const bankName = document.createElement('span');
-  bankName.className = 'bank-name';
-  bankName.setAttribute('aria-live', 'polite');
-
   const bankNextButton = document.createElement('button');
   bankNextButton.type = 'button';
   bankNextButton.className = 'button button-small';
@@ -148,16 +258,15 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
 
   engineRow.append(
     engineButton,
+    programLabel,
+    programPrevButton,
+    programNextButton,
     bankLabel,
     bankPrevButton,
-    bankName,
     bankNextButton,
     loadButton,
     removeButton,
     fileInput,
-    programLabel,
-    programPrevButton,
-    programNextButton,
   );
 
   const midiRow = document.createElement('div');
@@ -184,36 +293,28 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
 
   midiRow.append(midiLabel, midiConnect, midiSelect, midiStatus);
 
-  const volumeWrap = document.createElement('div');
-  volumeWrap.className = 'volume-wrap';
+  const knobs = document.createElement('div');
+  knobs.className = 'knobs';
 
-  const volumeLabel = document.createElement('span');
-  volumeLabel.className = 'field-label';
-  volumeLabel.textContent = 'VOLUME';
+  const volumeKnob = createKnob({
+    id: 'volume',
+    label: 'VOL',
+    ariaLabel: 'volume',
+    max: MAX_VOLUME,
+    getValue: () => volume,
+    setValue: (value) => setVolume(value),
+  });
+  const sensitivityKnob = createKnob({
+    id: 'sensitivity',
+    label: 'SENS',
+    ariaLabel: 'velocity sensitivity',
+    max: MAX_SENSITIVITY,
+    getValue: () => sensitivity,
+    setValue: (value) => setSensitivity(value),
+  });
 
-  const knob = document.createElement('div');
-  knob.className = 'knob';
-  knob.id = 'volume';
-  knob.tabIndex = 0;
-  knob.setAttribute('role', 'slider');
-  knob.setAttribute('aria-label', 'volume');
-  knob.setAttribute('aria-valuemin', '0');
-  knob.setAttribute('aria-valuemax', String(MAX_VOLUME));
-  knob.setAttribute('aria-valuenow', String(volume));
-
-  const knobDial = document.createElement('div');
-  knobDial.className = 'knob-dial';
-
-  const knobPointer = document.createElement('span');
-  knobPointer.className = 'knob-pointer';
-  knobDial.append(knobPointer);
-
-  const knobValue = document.createElement('span');
-  knobValue.className = 'knob-value';
-
-  knob.append(knobDial, knobValue);
-  volumeWrap.append(volumeLabel, knob);
-  engineRow.append(volumeWrap);
+  knobs.append(sensitivityKnob.wrap, volumeKnob.wrap);
+  engineRow.append(knobs);
 
   const programGrid = document.createElement('div');
   programGrid.className = 'program-grid';
@@ -322,8 +423,6 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
 
   function refreshBankControls(): void {
     const bank = currentBank();
-    bankName.textContent = `${bank.name} (${bank.voices.length})`;
-    bankName.title = bank.name;
     bankPrevButton.disabled = banks.length < 2;
     bankNextButton.disabled = banks.length < 2;
     removeButton.disabled = bank.builtin === true || banks.length <= 1;
@@ -443,11 +542,28 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   function setVolume(percent: number): void {
     volume = Math.max(0, Math.min(MAX_VOLUME, Math.round(percent)));
     const angle = -135 + (volume / MAX_VOLUME) * 270;
-    knobDial.style.setProperty('--knob-angle', `${angle}deg`);
-    knobValue.textContent = String(volume);
-    knob.setAttribute('aria-valuenow', String(volume));
-    knob.setAttribute('aria-valuetext', `${volume}%`);
+    volumeKnob.dial.style.setProperty('--knob-angle', `${angle}deg`);
+    volumeKnob.element.setAttribute('aria-valuenow', String(volume));
+    volumeKnob.element.setAttribute('aria-valuetext', `${volume}%`);
     engine.setOutputGain(Math.round((volume / MAX_VOLUME) * Q16_ONE));
+  }
+
+  function setSensitivity(percent: number): void {
+    sensitivity = Math.max(
+      0,
+      Math.min(MAX_SENSITIVITY, Math.round(percent)),
+    );
+    const angle = -135 + (sensitivity / MAX_SENSITIVITY) * 270;
+    sensitivityKnob.dial.style.setProperty('--knob-angle', `${angle}deg`);
+    sensitivityKnob.element.setAttribute('aria-valuenow', String(sensitivity));
+    sensitivityKnob.element.setAttribute('aria-valuetext', `${sensitivity}%`);
+  }
+
+  function scaledVelocity(velocity: number): number {
+    const input = Math.max(0, Math.min(127, Math.round(velocity)));
+    const scaled =
+      127 - ((127 - input) * sensitivity) / MAX_SENSITIVITY;
+    return Math.max(0, Math.min(127, Math.round(scaled)));
   }
 
   function removeCurrentBank(): void {
@@ -693,7 +809,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
       return;
     }
     downNotes.add(note);
-    engine.noteOn(note, 100);
+    engine.noteOn(note, scaledVelocity(100));
     refreshKey(note);
   }
 
@@ -730,7 +846,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     onNoteOn: (note, velocity) => {
       midiNotes.add(note);
       refreshKey(note);
-      engine.noteOn(note, velocity);
+      engine.noteOn(note, scaledVelocity(velocity));
     },
     onNoteOff: (note) => {
       midiNotes.delete(note);
@@ -826,70 +942,6 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     const bank = currentBank();
     selectProgram((program + 1) % bank.voices.length);
   });
-  let dragStartY = 0;
-  let dragStartVolume = 0;
-  knob.addEventListener('pointerdown', (event) => {
-    if (event.pointerType === 'mouse' && event.button !== 0) {
-      return;
-    }
-    event.preventDefault();
-    knob.setPointerCapture(event.pointerId);
-    knob.classList.add('dragging');
-    dragStartY = event.clientY;
-    dragStartVolume = volume;
-  });
-  knob.addEventListener('pointermove', (event) => {
-    if (!knob.hasPointerCapture(event.pointerId)) {
-      return;
-    }
-    event.preventDefault();
-    const delta = ((dragStartY - event.clientY) / 160) * MAX_VOLUME;
-    setVolume(dragStartVolume + delta);
-  });
-  const endKnobDrag = (event: PointerEvent): void => {
-    if (!knob.hasPointerCapture(event.pointerId)) {
-      return;
-    }
-    knob.releasePointerCapture(event.pointerId);
-    knob.classList.remove('dragging');
-  };
-  knob.addEventListener('pointerup', endKnobDrag);
-  knob.addEventListener('pointercancel', endKnobDrag);
-  knob.addEventListener(
-    'wheel',
-    (event) => {
-      event.preventDefault();
-      setVolume(volume + (event.deltaY < 0 ? 1 : -1));
-    },
-    { passive: false },
-  );
-  knob.addEventListener('keydown', (event) => {
-    switch (event.key) {
-      case 'ArrowUp':
-      case 'ArrowRight':
-        setVolume(volume + 1);
-        break;
-      case 'ArrowDown':
-      case 'ArrowLeft':
-        setVolume(volume - 1);
-        break;
-      case 'PageUp':
-        setVolume(volume + 10);
-        break;
-      case 'PageDown':
-        setVolume(volume - 10);
-        break;
-      case 'Home':
-        setVolume(0);
-        break;
-      case 'End':
-        setVolume(MAX_VOLUME);
-        break;
-      default:
-        return;
-    }
-    event.preventDefault();
-  });
   octaveDown.addEventListener('click', () => {
     allNotesOff();
     keyboard.setOctave(keyboard.octave - 1);
@@ -922,6 +974,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   refreshPrograms();
   buildPiano();
   setVolume(volume);
+  setSensitivity(sensitivity);
   const initialBank = freshCurrentBank();
   const initial = initialBank.voices[program] ?? null;
   if (initial !== null) {

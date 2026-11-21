@@ -14,7 +14,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SLOPSIX_REPO="${SLOPSIX_REPO:-https://github.com/cmatsuoka/slopsix.git}"
-SLOPSIX_COMMIT="${SLOPSIX_COMMIT:-824b81dd5684e503147edfceb7f28448a32e1264}"
+SLOPSIX_COMMIT="${SLOPSIX_COMMIT:-e30a5567ece68c86f5c11a1d906c2d2542959d9c}"
 # The checkout of the library that carries the newest API.
 SLOPSIX_SIBLING="${SLOPSIX_SIBLING:-$ROOT/../slopsix}"
 # The pristine sources the build is made from.
