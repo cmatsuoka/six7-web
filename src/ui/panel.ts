@@ -640,7 +640,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     const input = Math.max(0, Math.min(127, Math.round(velocity)));
     const maxVelocity = maximumVelocity();
     const scaled =
-      maxVelocity - (maxVelocity - input) * sensitivity / MAX_SENSITIVITY;
+      100 + (input - 100) * sensitivity / MAX_SENSITIVITY;
     return Math.max(0, Math.min(maxVelocity, Math.round(scaled)));
   }
 
@@ -887,7 +887,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
       return;
     }
     downNotes.add(note);
-    engine.noteOn(note, maximumVelocity());
+    engine.noteOn(note, 100);
     refreshKey(note);
   }
 
