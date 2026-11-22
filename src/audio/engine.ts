@@ -164,6 +164,12 @@ export class Six7Engine {
     this.poke();
   }
 
+  /** Normalize the DX7S output gain to the DX7 Mk1's level. */
+  setDigitalOutputGain(normalize: boolean): void {
+    this.post({ type: 'digitalOutputGain', normalize });
+    this.poke();
+  }
+
   setPitchBend(value: number): void {
     this.post({ type: 'bend', value: clampInt(value, 0, 16383) });
     this.poke();

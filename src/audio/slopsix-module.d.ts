@@ -40,6 +40,7 @@ declare module '*slopsix.mjs' {
     _six7_set_peg_rate_scaling(ctx: number, depth: number): number;
     _six7_set_master_volume(ctx: number, level: number): number;
     _six7_set_output_gain(ctx: number, gainQ16: number): number;
+    _six7_set_digital_output_gain(ctx: number, normalize: number): number;
     _six7_set_master_tune(ctx: number, centsQ16: number): number;
     _six7_set_pitch_bend(ctx: number, bend: number): number;
     _six7_set_pitch_bend_range(

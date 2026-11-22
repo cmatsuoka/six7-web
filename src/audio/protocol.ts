@@ -93,6 +93,8 @@ export type EngineCommand =
   | { type: 'allNotesOff' }
   /** Set the host output gain, Q16: 0 is silence, 65536 is unity. */
   | { type: 'outputGain'; gainQ16: number }
+  /** Normalize the DX7S output gain to the DX7 Mk1's level. */
+  | { type: 'digitalOutputGain'; normalize: boolean }
   /** Set a controller's value, 0..127. */
   | { type: 'ctrl'; source: CtrlSource; value: number }
   /** Set a controller's range, 0..99. */

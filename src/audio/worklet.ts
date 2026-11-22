@@ -287,6 +287,13 @@ class Six7Processor extends AudioWorkletProcessor {
         module._six7_set_output_gain(this.context, command.gainQ16);
         break;
       }
+      case 'digitalOutputGain': {
+        module._six7_set_digital_output_gain(
+          this.context,
+          command.normalize ? 1 : 0,
+        );
+        break;
+      }
       case 'ctrl': {
         module._six7_set_ctrl_value(
           this.context,

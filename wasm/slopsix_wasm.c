@@ -191,6 +191,11 @@ WASM_EXPORT int32_t six7_set_output_gain(void *ctx, int32_t gain_q16)
     return (int32_t)slopsix_set_output_gain(ctx, gain_q16);
 }
 
+WASM_EXPORT int32_t six7_set_digital_output_gain(void *ctx, int32_t normalize)
+{
+    return (int32_t)slopsix_set_digital_output_gain(ctx, normalize != 0);
+}
+
 WASM_EXPORT int32_t six7_set_master_tune(void *ctx, int32_t cents_q16)
 {
     return (int32_t)slopsix_set_master_tune(ctx, cents_q16);

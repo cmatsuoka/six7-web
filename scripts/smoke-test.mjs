@@ -121,6 +121,11 @@ check(peak > 0, `the rendered audio is not silent (peak ${peak})`);
 check(peak <= 32768, `the rendered audio stays inside int16 (peak ${peak})`);
 
 equal(engine.six7_note_off(context, 60), 0, 'the note is released');
+equal(
+  engine.six7_set_digital_output_gain(context, 1),
+  1,
+  'the DX7 reports output-gain normalization as unsupported',
+);
 engine.six7_destroy(context);
 
 const dx7s = engine.six7_create(1, SAMPLE_RATE);
@@ -131,6 +136,16 @@ equal(engine.six7_set_peg_range(dx7s, 0), 0, 'the DX7S pitch-EG range is set');
 equal(engine.six7_set_peg_velocity(dx7s, 1), 0, 'the DX7S pitch-EG velocity is set');
 equal(engine.six7_set_peg_rate_scaling(dx7s, 7), 0, 'the DX7S pitch-EG rate scaling is set');
 equal(engine.six7_set_lfo_mode(dx7s, 1), 0, 'the DX7S LFO mode is set');
+equal(
+  engine.six7_set_digital_output_gain(dx7s, 1),
+  0,
+  'the DX7S output gain is normalized',
+);
+equal(
+  engine.six7_set_digital_output_gain(dx7s, 0),
+  0,
+  'the DX7S output gain is denormalized',
+);
 engine.six7_destroy(dx7s);
 
 if (failures > 0) {

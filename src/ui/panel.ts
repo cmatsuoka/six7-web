@@ -173,6 +173,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   let lcdTimer: ReturnType<typeof setTimeout> | null = null;
   let lcdLineOne = starter.name;
   let engineType: EngineType = ENGINE_DX7;
+  let normalizeOutput = false;
 
   const display = createDisplay();
 
@@ -328,7 +329,32 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     setValue: (value) => setSensitivity(value),
   });
 
-  knobs.append(sensitivityKnob.wrap, volumeKnob.wrap);
+  const normalizeWrap = document.createElement('div');
+  normalizeWrap.className = 'knob-wrap';
+
+  const normalizeButton = document.createElement('button');
+  normalizeButton.type = 'button';
+  normalizeButton.className = 'button button-quiet normalize-button';
+  normalizeButton.setAttribute('aria-label', 'output gain normalization');
+  normalizeButton.setAttribute('aria-pressed', 'false');
+  normalizeButton.title = 'Normalize the DX7S output gain to the DX7 level';
+
+  const normalizeLed = document.createElement('span');
+  normalizeLed.className = 'led-rect';
+  normalizeLed.setAttribute('aria-hidden', 'true');
+
+  const normalizeText = document.createElement('span');
+  normalizeText.textContent = 'NORM';
+
+  normalizeButton.append(normalizeLed, normalizeText);
+
+  const normalizeLabel = document.createElement('span');
+  normalizeLabel.className = 'field-label';
+  normalizeLabel.textContent = 'GAIN';
+
+  normalizeWrap.append(normalizeButton, normalizeLabel);
+
+  knobs.append(sensitivityKnob.wrap, volumeKnob.wrap, normalizeWrap);
   engineRow.append(knobs);
 
   const programGrid = document.createElement('div');
@@ -474,6 +500,12 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
    * number, ten-character patch name and engine personality on the second.
    */
   function renderPatchInfo(): void {
+    const available = engineType === ENGINE_DX7S;
+    normalizeButton.disabled = !available;
+    normalizeButton.title = available
+      ? 'Normalize the DX7S output gain to the DX7 level'
+      : 'Output gain normalization is a DX7S feature';
+    normalizeButton.classList.toggle('lit', available && normalizeOutput);
     const bank = currentBank();
     const voice = currentVoice();
     const cartridge = bank.builtin !== true;
@@ -563,6 +595,13 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     engine.setOutputGain(Math.round((volume / MAX_VOLUME) * Q16_ONE));
   }
 
+  function setNormalizeOutput(on: boolean): void {
+    normalizeOutput = on;
+    normalizeButton.setAttribute('aria-pressed', on ? 'true' : 'false');
+    normalizeButton.classList.toggle('lit', on && engineType === ENGINE_DX7S);
+    engine.setDigitalOutputGain(on);
+  }
+
   function setSensitivity(percent: number): void {
     sensitivity = Math.max(
       0,
@@ -575,12 +614,16 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     scheduleSensitivitySave(sensitivity);
   }
 
+  function maximumVelocity(): number {
+    return engineType === ENGINE_DX7S ? 120 : 108;
+  }
+
   function scaledVelocity(velocity: number): number {
     const input = Math.max(0, Math.min(127, Math.round(velocity)));
-    const normalized = (input * 100) / 127;
+    const maxVelocity = maximumVelocity();
     const scaled =
-      100 - (100 - normalized) * (MAX_SENSITIVITY - sensitivity) / MAX_SENSITIVITY;
-    return Math.max(0, Math.min(100, Math.round(scaled)));
+      maxVelocity - (maxVelocity - input) * sensitivity / MAX_SENSITIVITY;
+    return Math.max(0, Math.min(maxVelocity, Math.round(scaled)));
   }
 
   function removeCurrentBank(): void {
@@ -826,7 +869,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
       return;
     }
     downNotes.add(note);
-    engine.noteOn(note, scaledVelocity(100));
+    engine.noteOn(note, maximumVelocity());
     refreshKey(note);
   }
 
@@ -950,6 +993,9 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     }
     fileInput.value = '';
   });
+  normalizeButton.addEventListener('click', () => {
+    setNormalizeOutput(!normalizeOutput);
+  });
   removeButton.addEventListener('click', removeCurrentBank);
   programPrevButton.addEventListener('click', () => {
     const bank = currentBank();
@@ -992,6 +1038,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   buildPiano();
   setVolume(volume);
   setSensitivity(sensitivity);
+  setNormalizeOutput(normalizeOutput);
   const initialBank = freshCurrentBank();
   const initial = initialBank.voices[program] ?? null;
   if (initial !== null) {

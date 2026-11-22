@@ -14,7 +14,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SLOPSIX_REPO="${SLOPSIX_REPO:-https://github.com/cmatsuoka/slopsix.git}"
-SLOPSIX_COMMIT="${SLOPSIX_COMMIT:-3db9cbde5b3c9416534b69fe70e5133b6aa2616b}"
+SLOPSIX_COMMIT="${SLOPSIX_COMMIT:-88b5cbc9790eea2ebbac3d049c680d24d13c55df}"
 # The checkout of the library that carries the newest API.
 SLOPSIX_SIBLING="${SLOPSIX_SIBLING:-$ROOT/../slopsix}"
 # The pristine sources the build is made from.
@@ -133,7 +133,7 @@ fi
 
 # Only the glue is exported. The allocator stays on: the library calls
 # calloc() for its context.
-EXPORTED_FUNCTIONS='["_malloc","_free","_six7_version_number","_six7_create","_six7_destroy","_six7_reset","_six7_set_voice","_six7_get_voice","_six7_process","_six7_note_on","_six7_note_off","_six7_all_notes_off","_six7_set_ctrl_value","_six7_set_ctrl_range","_six7_set_ctrl_assign","_six7_set_sustain","_six7_set_lfo_mode","_six7_set_key_mode","_six7_set_unison_detune","_six7_set_peg_range","_six7_set_peg_velocity","_six7_set_peg_rate_scaling","_six7_set_master_volume","_six7_set_output_gain","_six7_set_master_tune","_six7_set_pitch_bend","_six7_set_pitch_bend_range","_six7_voice_dump_size","_six7_voice_count","_six7_context_engine"]'
+EXPORTED_FUNCTIONS='["_malloc","_free","_six7_version_number","_six7_create","_six7_destroy","_six7_reset","_six7_set_voice","_six7_get_voice","_six7_process","_six7_note_on","_six7_note_off","_six7_all_notes_off","_six7_set_ctrl_value","_six7_set_ctrl_range","_six7_set_ctrl_assign","_six7_set_sustain","_six7_set_lfo_mode","_six7_set_key_mode","_six7_set_unison_detune","_six7_set_peg_range","_six7_set_peg_velocity","_six7_set_peg_rate_scaling","_six7_set_master_volume","_six7_set_output_gain","_six7_set_digital_output_gain","_six7_set_master_tune","_six7_set_pitch_bend","_six7_set_pitch_bend_range","_six7_voice_dump_size","_six7_voice_count","_six7_context_engine"]'
 
 # Build with DX7S personality enabled. The DX7 is the default engine;
 # the host picks DX7 or DX7S at context creation.
