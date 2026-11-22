@@ -57,6 +57,9 @@ export class MidiInput {
     }
     const devices: MidiDevice[] = [];
     for (const input of access.inputs.values()) {
+      if (input.state !== 'connected') {
+        continue;
+      }
       devices.push({ id: input.id, name: input.name ?? input.id });
     }
     return devices;
@@ -66,6 +69,9 @@ export class MidiInput {
   select(id: string | null): void {
     this.selectedId = id;
     this.listen();
+    if (this.access !== null) {
+      this.handlers.onStatus(this.describe());
+    }
   }
 
   async connect(): Promise<void> {
@@ -123,7 +129,9 @@ export class MidiInput {
 
     for (const [id, input] of this.attached) {
       const wanted =
-        selected === null || id === selected ? access.inputs.has(id) : false;
+        input.state === 'connected' &&
+        access.inputs.has(id) &&
+        (selected === null || id === selected);
       if (!wanted) {
         input.onmidimessage = null;
         this.attached.delete(id);
@@ -131,6 +139,9 @@ export class MidiInput {
     }
 
     for (const [id, input] of access.inputs) {
+      if (input.state !== 'connected') {
+        continue;
+      }
       if (selected !== null && id !== selected) {
         continue;
       }
@@ -145,7 +156,7 @@ export class MidiInput {
   }
 
   private describe(): string {
-    const count = this.devices.length;
+    const count = this.attached.size;
     if (count === 0) {
       return 'MIDI connected, no inputs';
     }
