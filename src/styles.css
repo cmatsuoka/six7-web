@@ -132,6 +132,7 @@ body {
 }
 
 .brand {
+  margin-top: -70px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -158,6 +159,14 @@ body {
 
 /* --------------------------------------------------------- display cluster */
 
+.display-wrapper {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
 .display-bezel {
   flex: 1 1 auto;
   min-width: 0;
@@ -168,6 +177,61 @@ body {
   box-shadow:
     inset 0 2px 7px rgba(0, 0, 0, 0.9),
     0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.display-buttons {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 32px;
+  padding: 0 11px;
+  margin-top: 4px;
+}
+
+.display-buttons .button.store-button {
+  position: absolute;
+  top: 7px;
+  right: calc(100% + 21px);
+  margin-left: 0;
+}
+
+.vol-norm-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.display-buttons .knobs {
+  margin-right: -16px;
+}
+
+.display-buttons .button.engine-button {
+  margin-top: 7px;
+  margin-left: 0;
+}
+
+.bank-buttons-group .program-label-inline::before,
+.bank-buttons-group .program-label-inline::after {
+  width: 6px;
+}
+
+.button.bank-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  min-width: 48px;
+  padding: 0 8px;
+  margin-left: 8px;
+  font-size: 9px;
+}
+
+.button.bank-action-button.store-button {
+  color: #a8d68a;
+}
+
+.button.bank-action-button.del-button {
+  color: #e08b7d;
 }
 
 .display-cluster {
@@ -322,10 +386,6 @@ body {
   margin-left: 14px;
 }
 
-.source-row .program-label {
-  margin-left: 14px;
-}
-
 .bank-select {
   flex: 1 1 200px;
   min-width: 0;
@@ -471,11 +531,51 @@ body {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  height: 30px;
+  height: 34px;
   min-width: 48px;
   padding: 1px 8px;
   font-size: 9px;
 }
+
+.program-buttons-group {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin-top: 7px;
+}
+
+.program-nav-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  padding: 0 12px;
+  font-size: 14px;
+}
+
+.program-label-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #a9ada5;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.program-label-inline::before,
+.program-label-inline::after {
+  content: '';
+  display: block;
+  width: 12px;
+  height: 1px;
+  background: rgba(169, 173, 165, 0.35);
+}
+
+
 
 .led-rect {
   width: 14px;
@@ -496,7 +596,7 @@ body {
 .program-grid {
   display: grid;
   grid-template-columns: repeat(16, minmax(0, 1fr));
-  gap: 6px;
+  gap: 10px 6px;
   padding: 22px 0px;
   #margin-inline: -20px;
   #padding: 22px 24px;
@@ -509,21 +609,24 @@ body {
 }
 
 .program-button {
-  height: 32px;
-  border: 1px solid #0c0d0b;
-  border-radius: 3px;
-  background: linear-gradient(180deg, #4c4b47, #2e2d2a);
-  color: #cfd2ca;
-  font-family: ui-monospace, monospace;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid #0b0b0a;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #4b4a46, #34332f);
+  color: #b4b7af;
+  font-family: inherit;
   font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
   cursor: pointer;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 1px 2px rgba(0, 0, 0, 0.4);
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    0 1px 2px rgba(0, 0, 0, 0.45);
 }
 
 .program-button:hover {
-  background: linear-gradient(180deg, #5a5954, #383733);
+  background: linear-gradient(180deg, #595852, #3d3c37);
 }
 
 .program-button.selected {
@@ -690,6 +793,7 @@ body {
 
 .midi-row {
   align-items: center;
+  margin-top: -32px;
 }
 
 .midi-select {

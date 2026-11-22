@@ -196,24 +196,78 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   brandSub.className = 'brand-sub';
   brandSub.textContent = 'FM SYNTHESIZER';
 
+  const storeButton = document.createElement('button');
+  storeButton.type = 'button';
+  storeButton.className = 'button button-quiet bank-action-button store-button';
+  storeButton.textContent = 'STORE';
+  storeButton.setAttribute('aria-label', 'store voice');
+
   brand.append(brandLogo, brandSub);
+
+  const displayWrapper = document.createElement('div');
+  displayWrapper.className = 'display-wrapper';
+
+  const programButtonsWrap = document.createElement('div');
+  programButtonsWrap.className = 'program-buttons-group';
+
+  const programPrevButton = document.createElement('button');
+  programPrevButton.type = 'button';
+  programPrevButton.className = 'button button-quiet program-nav-button';
+  programPrevButton.setAttribute('aria-label', 'previous program');
+  programPrevButton.textContent = '−';
+
+  const programLabel = document.createElement('span');
+  programLabel.className = 'program-label-inline';
+  programLabel.textContent = 'PRG';
+
+  const programNextButton = document.createElement('button');
+  programNextButton.type = 'button';
+  programNextButton.className = 'button button-quiet program-nav-button';
+  programNextButton.setAttribute('aria-label', 'next program');
+  programNextButton.textContent = '+';
+
+  programButtonsWrap.append(programPrevButton, programLabel, programNextButton);
+
+  const bankButtonsWrap = document.createElement('div');
+  bankButtonsWrap.className = 'program-buttons-group bank-buttons-group';
+
+  const bankPrevButton = document.createElement('button');
+  bankPrevButton.type = 'button';
+  bankPrevButton.className = 'button button-quiet program-nav-button';
+  bankPrevButton.setAttribute('aria-label', 'previous bank');
+  bankPrevButton.textContent = '−';
+
+  const bankLabel = document.createElement('span');
+  bankLabel.className = 'program-label-inline';
+  bankLabel.textContent = 'BANK';
+
+  const bankNextButton = document.createElement('button');
+  bankNextButton.type = 'button';
+  bankNextButton.className = 'button button-quiet program-nav-button';
+  bankNextButton.setAttribute('aria-label', 'next bank');
+  bankNextButton.textContent = '+';
+
+  bankButtonsWrap.append(bankPrevButton, bankLabel, bankNextButton);
 
   const displayBezel = document.createElement('div');
   displayBezel.className = 'display-bezel';
   displayBezel.append(display.element);
 
-  caseTop.append(brand, displayBezel);
+  const displayButtons = document.createElement('div');
+  displayButtons.className = 'display-buttons';
+  displayButtons.append(storeButton, programButtonsWrap, bankButtonsWrap);
+
+  displayWrapper.append(displayBezel, displayButtons);
+
+  caseTop.append(brand, displayWrapper);
 
   const controls = document.createElement('div');
   controls.className = 'controls';
 
-  const engineRow = document.createElement('div');
-  engineRow.className = 'control-row source-row';
-
   const engineButton = document.createElement('button');
   engineButton.type = 'button';
-  engineButton.className = 'button engine-button';
-  engineButton.textContent = 'ENGINE';
+  engineButton.className = 'button button-quiet bank-action-button engine-button';
+  engineButton.textContent = 'ENG';
   engineButton.setAttribute('aria-label', 'cycle engine personality');
 
   engineButton.addEventListener('click', () => {
@@ -224,42 +278,11 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     renderPatchInfo();
   });
 
-  const bankLabel = document.createElement('span');
-  bankLabel.className = 'field-label bank-label';
-  bankLabel.textContent = 'BANK';
-
-  const bankPrevButton = document.createElement('button');
-  bankPrevButton.type = 'button';
-  bankPrevButton.className = 'button button-small';
-  bankPrevButton.textContent = '−';
-  bankPrevButton.setAttribute('aria-label', 'previous bank');
-
-  const bankNextButton = document.createElement('button');
-  bankNextButton.type = 'button';
-  bankNextButton.className = 'button button-small';
-  bankNextButton.textContent = '+';
-  bankNextButton.setAttribute('aria-label', 'next bank');
-
-  const programLabel = document.createElement('span');
-  programLabel.className = 'field-label program-label';
-  programLabel.textContent = 'PRG';
-
-  const programPrevButton = document.createElement('button');
-  programPrevButton.type = 'button';
-  programPrevButton.className = 'button button-small';
-  programPrevButton.textContent = '−';
-  programPrevButton.setAttribute('aria-label', 'previous program');
-
-  const programNextButton = document.createElement('button');
-  programNextButton.type = 'button';
-  programNextButton.className = 'button button-small';
-  programNextButton.textContent = '+';
-  programNextButton.setAttribute('aria-label', 'next program');
-
   const loadButton = document.createElement('button');
   loadButton.type = 'button';
-  loadButton.className = 'button';
-  loadButton.textContent = 'Load bank…';
+  loadButton.className = 'button button-quiet bank-action-button';
+  loadButton.textContent = 'LOAD';
+  loadButton.setAttribute('aria-label', 'load bank');
 
   const fileInput = document.createElement('input');
   fileInput.type = 'file';
@@ -269,21 +292,13 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
 
   const removeButton = document.createElement('button');
   removeButton.type = 'button';
-  removeButton.className = 'button button-quiet';
-  removeButton.textContent = 'Remove bank';
+  removeButton.className = 'button button-quiet bank-action-button del-button';
+  removeButton.textContent = 'DEL';
+  removeButton.setAttribute('aria-label', 'delete bank');
 
-  engineRow.append(
-    engineButton,
-    programLabel,
-    programPrevButton,
-    programNextButton,
-    bankLabel,
-    bankPrevButton,
-    bankNextButton,
-    loadButton,
-    removeButton,
-    fileInput,
-  );
+  bankButtonsWrap.append(loadButton, removeButton);
+
+  controls.append(fileInput);
 
   const midiRow = document.createElement('div');
   midiRow.className = 'control-row midi-row';
@@ -329,9 +344,6 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     setValue: (value) => setSensitivity(value),
   });
 
-  const normalizeWrap = document.createElement('div');
-  normalizeWrap.className = 'knob-wrap';
-
   const normalizeButton = document.createElement('button');
   normalizeButton.type = 'button';
   normalizeButton.className = 'button button-quiet normalize-button';
@@ -348,14 +360,21 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
 
   normalizeButton.append(normalizeLed, normalizeText);
 
-  const normalizeLabel = document.createElement('span');
-  normalizeLabel.className = 'field-label';
-  normalizeLabel.textContent = 'GAIN';
+  const volNormCluster = document.createElement('div');
+  volNormCluster.className = 'knob-wrap';
 
-  normalizeWrap.append(normalizeButton, normalizeLabel);
+  const volNormRow = document.createElement('div');
+  volNormRow.className = 'vol-norm-row';
+  volNormRow.append(volumeKnob.element, normalizeButton);
 
-  knobs.append(sensitivityKnob.wrap, volumeKnob.wrap, normalizeWrap);
-  engineRow.append(knobs);
+  const volNormLabel = document.createElement('span');
+  volNormLabel.className = 'field-label';
+  volNormLabel.textContent = 'VOL';
+
+  volNormCluster.append(volNormRow, volNormLabel);
+
+  knobs.append(sensitivityKnob.wrap);
+  displayButtons.append(engineButton, knobs, volNormCluster);
 
   const programGrid = document.createElement('div');
   programGrid.className = 'program-grid';
@@ -367,7 +386,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'program-button';
-    button.textContent = String(slot + 1).padStart(2, '0');
+    button.textContent = String(slot + 1);
     button.addEventListener('click', () => {
       selectProgram(slot);
     });
@@ -418,7 +437,6 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     'Using <a href="https://github.com/cmatsuoka/slopsix" rel="noreferrer" target="_blank">libslopsix</a>';
 
   controls.append(
-    engineRow,
     midiRow,
     programGrid,
     keyboardPanel,
@@ -475,7 +493,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
       const voice = bank.voices[slot];
       button.hidden = voice === undefined;
       button.disabled = voice === undefined;
-      button.textContent = String(slot + 1).padStart(2, '0');
+      button.textContent = String(slot + 1);
       button.title = voice === undefined ? '' : voice.name;
       button.setAttribute(
         'aria-label',
