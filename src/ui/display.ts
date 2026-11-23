@@ -190,17 +190,23 @@ function formatPatchDetails(details: PatchDetails): string {
   return `${algorithm} · ${peg} · ${mode} · ${unison}`;
 }
 
+/**
+ * The PEG range as a fraction of the Mk1's own eight-octave span, not the
+ * raw additional-voice value: the engine divides the envelope's excursion
+ * by 8, 4, 2 or 1.  The 2-vs-4-octave label conflict is unresolved, so the
+ * middle value follows the engine's chart reading (two octaves, 1/4).
+ */
 function pegRangeLabel(pegRange: number): string {
   switch (pegRange) {
     case PEG_RANGE_2_OCTAVES:
-      return '2';
+      return '1/4';
     case PEG_RANGE_1_OCTAVE:
-      return '1';
+      return '1/8';
     case PEG_RANGE_HALF_OCTAVE:
-      return '1/2';
+      return '1/16';
     case PEG_RANGE_8_OCTAVES:
     default:
-      return '8';
+      return '1';
   }
 }
 

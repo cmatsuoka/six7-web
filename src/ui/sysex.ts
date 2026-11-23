@@ -374,10 +374,13 @@ function unpackAced(data: Uint8Array): VoiceExtensions {
 
 function unpackAmemVoice(data: Uint8Array, offset: number): VoiceExtensions {
   const composite = at(data, offset + 4);
-  const mode = at(data, offset + 5);
+  // Byte 5 packs the pitch-bend range (bits 6..3) with the key mode
+  // (bits 1..0).  Byte 34 packs FCCS1SW in bit 3 above the three-bit
+  // unison detune, so the detune must be masked, not clamped whole.
+  const bendAndMode = at(data, offset + 5);
   return {
-    keyMode: mode & 0x03,
-    unisonDetune: clampField(at(data, offset + 34), 7),
+    keyMode: bendAndMode & 0x03,
+    unisonDetune: at(data, offset + 34) & 0x07,
     pegRange: composite & 0x03,
     pegVelocity: (composite >> 3) & 0x01,
     pegRateScaling: clampField(at(data, offset + 24), 7),
