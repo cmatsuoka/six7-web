@@ -188,10 +188,16 @@ body {
   margin-top: 4px;
 }
 
-.display-buttons .button.store-button {
+.display-buttons .left-buttons {
   position: absolute;
   top: 7px;
   right: calc(100% + 21px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.display-buttons .left-buttons .button {
   margin-left: 0;
 }
 
@@ -205,9 +211,8 @@ body {
   margin-right: -16px;
 }
 
-.display-buttons .button.engine-button {
+.display-buttons .button.store-button {
   margin-top: 7px;
-  margin-left: 0;
 }
 
 .bank-buttons-group .program-label-inline::before,
@@ -230,8 +235,20 @@ body {
   color: #a8d68a;
 }
 
+.button.bank-action-button.ab-button {
+  color: #cbd6a4;
+}
+
 .button.bank-action-button.del-button {
   color: #e08b7d;
+}
+
+.button.bank-action-button.lit {
+  color: #101610;
+  background: linear-gradient(180deg, #bfe3a2, #8fbd72);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    0 0 8px rgba(168, 214, 138, 0.55);
 }
 
 .display-cluster {
@@ -636,6 +653,15 @@ body {
   box-shadow:
     inset 0 0 0 1px rgba(255, 215, 120, 0.28),
     0 0 9px rgba(231, 178, 75, 0.3);
+}
+
+.program-button.store-target {
+  border-color: #a8d68a;
+  background: linear-gradient(180deg, #6f8f56, #3f5733);
+  color: #eafbe0;
+  box-shadow:
+    inset 0 0 0 1px rgba(168, 214, 138, 0.3),
+    0 0 9px rgba(168, 214, 138, 0.35);
 }
 
 /* ------------------------------------------------------------- the keyboard */

@@ -1,6 +1,21 @@
-import { decodeBank, encodeBank, type Bank, type StoredBank } from './bank';
+import {
+  base64ToBytes,
+  bytesToBase64,
+  decodeBank,
+  encodeBank,
+  makeVoice,
+  type Bank,
+  type StoredBank,
+  type Voice,
+} from './bank';
+import {
+  BANK_VOICE_COUNT,
+  VOICE_DUMP_SIZE,
+  type VoiceExtensions,
+} from '../audio/protocol';
 
 const BANKS_KEY = 'six7.banks.v1';
+const INTERNAL_KEY = 'six7.internal.v1';
 
 function read(key: string): string | null {
   try {
@@ -75,8 +90,108 @@ export function saveBanks(banks: readonly Bank[]): void {
   write(BANKS_KEY, JSON.stringify(stored));
 }
 
-const SETTINGS_KEY = 'six7.settings.v1';
+/**
+ * The internal memory: the voices the user stored in the internal
+ * positions. A position without a stored voice is null, and keeps the
+ * initial voice the starter bank generates.
+ */
+export function loadInternalMemory(): (Voice | null)[] {
+  const slots: (Voice | null)[] = new Array(BANK_VOICE_COUNT).fill(null);
+  const raw = read(INTERNAL_KEY);
+  if (raw === null) {
+    return slots;
+  }
 
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    remove(INTERNAL_KEY);
+    return slots;
+  }
+
+  if (!Array.isArray(parsed)) {
+    remove(INTERNAL_KEY);
+    return slots;
+  }
+
+  for (const [index, entry] of parsed.entries()) {
+    if (index >= BANK_VOICE_COUNT) {
+      break;
+    }
+    const voice = decodeInternalVoice(entry);
+    if (voice !== null) {
+      slots[index] = voice;
+    }
+  }
+  return slots;
+}
+
+/** Persist the internal memory. Only the stored positions are written. */
+export function saveInternalMemory(voices: readonly (Voice | null)[]): void {
+  const stored = voices.map((voice) =>
+    voice === null
+      ? null
+      : {
+          data: bytesToBase64(voice.data),
+          extensions: voice.extensions ?? null,
+        },
+  );
+  if (stored.every((entry) => entry === null)) {
+    remove(INTERNAL_KEY);
+    return;
+  }
+  write(INTERNAL_KEY, JSON.stringify(stored));
+}
+
+/** A malformed entry is discarded, not fatal. */
+function decodeInternalVoice(entry: unknown): Voice | null {
+  if (typeof entry !== 'object' || entry === null) {
+    return null;
+  }
+  const { data, extensions } = entry as {
+    data?: unknown;
+    extensions?: unknown;
+  };
+  if (typeof data !== 'string') {
+    return null;
+  }
+
+  let bytes: Uint8Array;
+  try {
+    bytes = base64ToBytes(data);
+  } catch {
+    return null;
+  }
+  if (bytes.length !== VOICE_DUMP_SIZE) {
+    return null;
+  }
+  return makeVoice(bytes, decodeExtensions(extensions));
+}
+
+function decodeExtensions(value: unknown): VoiceExtensions | undefined {
+  if (typeof value !== 'object' || value === null) {
+    return undefined;
+  }
+  const entry = value as Record<string, unknown>;
+  const field = (raw: unknown, max: number): number => {
+    if (typeof raw !== 'number' || !Number.isFinite(raw)) {
+      return 0;
+    }
+    const clamped = Math.round(raw);
+    return clamped < 0 ? 0 : clamped > max ? max : clamped;
+  };
+  return {
+    keyMode: field(entry.keyMode, 3),
+    unisonDetune: field(entry.unisonDetune, 7),
+    pegRange: field(entry.pegRange, 3),
+    pegVelocity: field(entry.pegVelocity, 1),
+    pegRateScaling: field(entry.pegRateScaling, 7),
+    lfoMode: field(entry.lfoMode, 1),
+  };
+}
+
+const SETTINGS_KEY = 'six7.settings.v1';
 export interface StoredSettings {
   sensitivity: number;
 }

@@ -90,6 +90,19 @@ export function createStarterBank(): Bank {
   };
 }
 
+/**
+ * The internal memory: the starter bank with the voices the user stored
+ * in its positions. A position without a stored voice keeps the bank's
+ * own initial voice.
+ */
+export function mergeStoredVoices(
+  bank: Bank,
+  stored: readonly (Voice | null)[],
+): Bank {
+  const voices = bank.voices.map((voice, index) => stored[index] ?? voice);
+  return { ...bank, voices };
+}
+
 export function newBankId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return crypto.randomUUID();
@@ -147,7 +160,7 @@ export function decodeBank(stored: StoredBank): Bank | null {
   };
 }
 
-function bytesToBase64(bytes: Uint8Array): string {
+export function bytesToBase64(bytes: Uint8Array): string {
   let binary = '';
   const chunk = 0x8000;
   for (let offset = 0; offset < bytes.length; offset += chunk) {
@@ -157,7 +170,7 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-function base64ToBytes(text: string): Uint8Array {
+export function base64ToBytes(text: string): Uint8Array {
   const binary = atob(text);
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) {

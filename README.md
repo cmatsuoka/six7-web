@@ -34,12 +34,25 @@ LCD but does not corrupt the data. A file with no readable dump shows
 `MIDI DATA ERROR!`, and a bank that was read shows ` MIDI RECEIVED`, the
 same transient messages the firmware uses.
 
+## Storing a voice
+
+The panel has 32 internal memory positions, the ones the bank list shows
+as internal voices. Press **STORE** to store the sounding patch: the
+program display then shows the internal memory position the patch will be
+written to, the program buttons pick that position, and a second **STORE**
+press writes the patch there. The panel then moves to the internal
+memory and the position that was written becomes the active program. Any
+button other than the program buttons cancels the pending store. The
+internal memory is kept across reloads, in the browser's local storage;
+the positions that were never written to keep the initial voices.
+
 ## Build details
 
 ```sh
 npm run build        # production build (runs build:wasm first)
 npm run typecheck    # tsc --noEmit
 npm run test:sysex   # node check of the SYSEX parser
+npm run test:storage # node check of the internal memory store
 npm run smoke        # node smoke test of the built engine
 ```
 

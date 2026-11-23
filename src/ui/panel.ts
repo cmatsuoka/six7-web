@@ -14,9 +14,11 @@ import {
   bankNameFromFile,
   createStarterBank,
   makeBank,
+  mergeStoredVoices,
   newBankId,
   reparseBank,
   type Bank,
+  type Voice,
 } from './bank';
 import {
   attachComputerKeyboard,
@@ -26,7 +28,7 @@ import {
 import { createDisplay } from './display';
 import { MidiInput, type MidiDevice } from '../audio/midi';
 import { parseSysex, voiceAlgorithm } from './sysex';
-import { loadBanks, saveBanks, loadSensitivity, scheduleSensitivitySave, cancelSensitivitySave } from './storage';
+import { loadBanks, saveBanks, loadInternalMemory, saveInternalMemory, loadSensitivity, scheduleSensitivitySave, cancelSensitivitySave } from './storage';
 
 const PROGRAM_BUTTON_COUNT = BANK_VOICE_COUNT;
 const ENGINE_TYPES: readonly EngineType[] = [ENGINE_DX7, ENGINE_DX7S];
@@ -159,11 +161,17 @@ function createKnob(options: KnobOptions): KnobControl {
 }
 
 export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
-  const starter = createStarterBank();
+  /** The voices the user stored in the internal memory, by position. */
+  let storedVoices: (Voice | null)[] = loadInternalMemory();
+  let starter = mergeStoredVoices(createStarterBank(), storedVoices);
   let banks: Bank[] = [starter, ...loadBanks()];
   let bankId = starter.id;
   let program = 0;
   let volume = 70;
+  /** The store operation is pending: a position is being chosen. */
+  let storeMode = false;
+  /** The internal memory position the pending store will write to. */
+  let storeTarget = 0;
   const savedSensitivity = loadSensitivity();
   let sensitivity =
     typeof savedSensitivity === 'number'
@@ -200,7 +208,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   storeButton.type = 'button';
   storeButton.className = 'button button-quiet bank-action-button store-button';
   storeButton.textContent = 'STORE';
-  storeButton.setAttribute('aria-label', 'store voice');
+  storeButton.setAttribute('aria-label', 'store voice in the internal memory');
 
   brand.append(brandLogo, brandSub);
 
@@ -255,7 +263,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
 
   const displayButtons = document.createElement('div');
   displayButtons.className = 'display-buttons';
-  displayButtons.append(storeButton, programButtonsWrap, bankButtonsWrap);
+  displayButtons.append(programButtonsWrap, bankButtonsWrap, storeButton);
 
   displayWrapper.append(displayBezel, displayButtons);
 
@@ -264,6 +272,16 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   const controls = document.createElement('div');
   controls.className = 'controls';
 
+  const leftButtons = document.createElement('div');
+  leftButtons.className = 'left-buttons';
+
+  const abButton = document.createElement('button');
+  abButton.type = 'button';
+  abButton.className = 'button button-quiet bank-action-button ab-button';
+  abButton.textContent = 'A/B';
+  abButton.setAttribute('aria-label', 'cancel the pending store');
+  abButton.title = 'Cancel a pending store';
+
   const engineButton = document.createElement('button');
   engineButton.type = 'button';
   engineButton.className = 'button button-quiet bank-action-button engine-button';
@@ -271,12 +289,15 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   engineButton.setAttribute('aria-label', 'cycle engine personality');
 
   engineButton.addEventListener('click', () => {
+    cancelStore();
     const index = ENGINE_TYPES.indexOf(engineType);
     const next = ENGINE_TYPES[(index + 1) % ENGINE_TYPES.length] ?? ENGINE_DX7;
     engineType = next;
     engine.setEngineType(engineType);
     renderPatchInfo();
   });
+
+  leftButtons.append(abButton, engineButton);
 
   const loadButton = document.createElement('button');
   loadButton.type = 'button';
@@ -374,7 +395,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   volNormCluster.append(volNormRow, volNormLabel);
 
   knobs.append(sensitivityKnob.wrap);
-  displayButtons.append(engineButton, knobs, volNormCluster);
+  displayButtons.append(leftButtons, knobs, volNormCluster);
 
   const programGrid = document.createElement('div');
   programGrid.className = 'program-grid';
@@ -388,6 +409,11 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     button.className = 'program-button';
     button.textContent = String(slot + 1);
     button.addEventListener('click', () => {
+      if (storeMode) {
+        storeTarget = slot;
+        refreshPrograms();
+        return;
+      }
       selectProgram(slot);
     });
     programButtons.push(button);
@@ -491,22 +517,43 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     const bank = currentBank();
     programButtons.forEach((button, slot) => {
       const voice = bank.voices[slot];
-      button.hidden = voice === undefined;
-      button.disabled = voice === undefined;
+      if (storeMode) {
+        // Every internal memory position is offered, not only the ones the
+        // current bank happens to hold.
+        button.hidden = false;
+        button.disabled = false;
+        button.title = `internal memory position ${slot + 1}`;
+        button.setAttribute('aria-label', `internal memory position ${slot + 1}`);
+      } else {
+        button.hidden = voice === undefined;
+        button.disabled = voice === undefined;
+        button.title = voice === undefined ? '' : voice.name;
+        button.setAttribute(
+          'aria-label',
+          voice === undefined
+            ? `program ${slot + 1}`
+            : `program ${slot + 1}: ${voice.name || 'unnamed'}`,
+        );
+      }
       button.textContent = String(slot + 1);
-      button.title = voice === undefined ? '' : voice.name;
+      button.classList.toggle('selected', !storeMode && slot === program);
+      button.classList.toggle('store-target', storeMode && slot === storeTarget);
       button.setAttribute(
-        'aria-label',
-        voice === undefined
-          ? `program ${slot + 1}`
-          : `program ${slot + 1}: ${voice.name || 'unnamed'}`,
+        'aria-pressed',
+        storeMode ? String(slot === storeTarget) : String(slot === program),
       );
-      button.classList.toggle('selected', slot === program);
-      button.setAttribute('aria-pressed', slot === program ? 'true' : 'false');
     });
 
     const voice = currentVoice();
-    display.setProgram(voice === null ? null : program + 1);
+    // While a store is pending the display shows the internal memory
+    // position the patch will be written to, not the sounding program.
+    display.setProgram(
+      storeMode ? storeTarget + 1 : voice === null ? null : program + 1,
+    );
+    storeButton.classList.toggle('lit', storeMode);
+    storeButton.title = storeMode
+      ? 'Store the voice in the selected internal memory position'
+      : 'Store the voice in the internal memory';
     cancelLcdFlash();
     renderPatchInfo();
     programPrevButton.disabled = bank.voices.length < 2;
@@ -602,6 +649,66 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     if (bank !== undefined) {
       selectBank(bank.id);
     }
+  }
+
+  /**
+   * The internal memory is the starter bank: the 32 positions the panel
+   * shows as internal voices, like the hardware's own RAM.
+   */
+  function storeInternalVoice(slot: number, voice: Voice): void {
+    storedVoices = storedVoices.slice();
+    storedVoices[slot] = voice;
+    starter = mergeStoredVoices(starter, storedVoices);
+    banks = banks.map((entry) => (entry.id === starter.id ? starter : entry));
+    saveInternalMemory(storedVoices);
+  }
+
+  /** Ask for the internal memory position the patch will be written to. */
+  function beginStore(): void {
+    if (currentVoice() === null) {
+      showError('There is no voice to store');
+      return;
+    }
+    storeMode = true;
+    storeTarget = program;
+    refreshPrograms();
+    showNotice(
+      'STORE: pick an internal memory position, then press STORE again to confirm',
+    );
+  }
+
+  /** Abandon the pending store; the sounding patch is left alone. */
+  function cancelStore(): void {
+    if (!storeMode) {
+      return;
+    }
+    storeMode = false;
+    refreshPrograms();
+    showNotice('Store cancelled');
+  }
+
+  /** Write the sounding patch to the chosen internal memory position. */
+  function confirmStore(): void {
+    if (!storeMode) {
+      showNotice('Press STORE to store the voice in the internal memory');
+      return;
+    }
+    const voice = currentVoice();
+    const slot = storeTarget;
+    storeMode = false;
+    if (voice === null) {
+      refreshPrograms();
+      showError('There is no voice to store');
+      return;
+    }
+    storeInternalVoice(slot, voice);
+    // The panel moves to the internal memory and the position that was
+    // written becomes the active program.
+    selectBank(starter.id);
+    selectProgram(slot);
+    showNotice(
+      `Stored "${voice.name || 'unnamed'}" in internal memory ${slot + 1}`,
+    );
   }
 
   function setVolume(percent: number): void {
@@ -983,15 +1090,19 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   }
 
   bankPrevButton.addEventListener('click', () => {
+    cancelStore();
     stepBank(-1);
   });
   bankNextButton.addEventListener('click', () => {
+    cancelStore();
     stepBank(1);
   });
   loadButton.addEventListener('click', () => {
+    cancelStore();
     fileInput.click();
   });
   midiConnect.addEventListener('click', () => {
+    cancelStore();
     void midi.connect().then(() => {
       if (midi.connected) {
         midiConnect.textContent = 'MIDI connected';
@@ -1012,23 +1123,45 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     fileInput.value = '';
   });
   normalizeButton.addEventListener('click', () => {
+    cancelStore();
     setNormalizeOutput(!normalizeOutput);
   });
-  removeButton.addEventListener('click', removeCurrentBank);
+  storeButton.addEventListener('click', () => {
+    if (storeMode) {
+      confirmStore();
+      return;
+    }
+    beginStore();
+  });
+  abButton.addEventListener('click', () => {
+    if (storeMode) {
+      cancelStore();
+      return;
+    }
+    showNotice('Press STORE to store the voice in the internal memory');
+  });
+  removeButton.addEventListener('click', () => {
+    cancelStore();
+    removeCurrentBank();
+  });
   programPrevButton.addEventListener('click', () => {
+    cancelStore();
     const bank = currentBank();
     selectProgram((program - 1 + bank.voices.length) % bank.voices.length);
   });
   programNextButton.addEventListener('click', () => {
+    cancelStore();
     const bank = currentBank();
     selectProgram((program + 1) % bank.voices.length);
   });
   octaveDown.addEventListener('click', () => {
+    cancelStore();
     allNotesOff();
     keyboard.setOctave(keyboard.octave - 1);
     buildPiano();
   });
   octaveUp.addEventListener('click', () => {
+    cancelStore();
     allNotesOff();
     keyboard.setOctave(keyboard.octave + 1);
     buildPiano();
