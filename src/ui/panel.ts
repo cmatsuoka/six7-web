@@ -179,6 +179,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
       : MAX_SENSITIVITY;
   let messageTimer: ReturnType<typeof setTimeout> | null = null;
   let lcdTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastWheelStep = 0;
   let lcdLineOne = starter.name;
   let engineType: EngineType = ENGINE_DX7;
   let normalizeOutput = false;
@@ -419,6 +420,27 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     programButtons.push(button);
     programGrid.append(button);
   }
+  programGrid.addEventListener(
+    'wheel',
+    (event) => {
+      if (storeMode || event.deltaY === 0) {
+        return;
+      }
+      event.preventDefault();
+      const now = performance.now();
+      if (now - lastWheelStep < 120) {
+        return;
+      }
+      lastWheelStep = now;
+      const bank = currentBank();
+      if (bank.voices.length < 2) {
+        return;
+      }
+      const delta = event.deltaY > 0 ? 1 : -1;
+      selectProgram((program + delta + bank.voices.length) % bank.voices.length);
+    },
+    { passive: false },
+  );
 
   const keyboardPanel = document.createElement('div');
   keyboardPanel.className = 'keyboard-panel';
