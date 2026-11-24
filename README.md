@@ -39,12 +39,17 @@ same transient messages the firmware uses.
 The panel has 32 internal memory positions, the ones the bank list shows
 as internal voices. Press **STORE** to store the sounding patch: the
 program display then shows the internal memory position the patch will be
-written to, the program buttons pick that position, and a second **STORE**
-press writes the patch there. The panel then moves to the internal
-memory and the position that was written becomes the active program. Any
-button other than the program buttons cancels the pending store. The
-internal memory is kept across reloads, in the browser's local storage;
-the positions that were never written to keep the initial voices.
+written to, the program buttons pick that position, and **OK** writes
+the patch there. The panel then moves to the internal memory and the
+position that was written becomes the active program, and the program
+digits blink as a confirmation. Pressing **STORE** again, or any other
+button, cancels the pending store. The internal memory is kept across
+reloads, in the browser's local storage; the positions that were never
+written to keep the initial voices.
+
+Deleting the selected bank also asks for a confirmation: press **DEL**,
+then **OK** to remove it. Pressing **DEL** again, or any other button,
+cancels the deletion.
 
 ## Build details
 

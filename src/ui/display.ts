@@ -42,7 +42,7 @@ const DIGIT_SEGMENTS: Readonly<Record<string, readonly string[]>> = {
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 const WIDE_LINE_COLUMNS = 48;
-const SECOND_LINE_COLUMNS = 25;
+const SECOND_LINE_COLUMNS = 30;
 
 export interface PatchDetails {
   /** The voice's algorithm, 1..32 as the panel numbers it. */
@@ -59,6 +59,8 @@ export interface Display {
   readonly element: HTMLElement;
   /** Show a 1-based program number, or blank both digits. */
   setProgram(program: number | null): void;
+  /** Blink the program digits a number of times. */
+  blinkProgram(times: number): void;
   /** Set both LCD lines; the second is padded to its full width. */
   setLines(first: string, second: string): void;
   /** Show the current voice's algorithm, PEG depth and key mode. */
@@ -84,6 +86,9 @@ export function createDisplay(): Display {
   const digitA = createDigit();
   const digitB = createDigit();
   digits.append(digitA.element, digitB.element);
+  digits.addEventListener('animationend', () => {
+    digits.classList.remove('blinking');
+  });
 
   led.append(ledLabel, digits);
 
@@ -127,6 +132,14 @@ export function createDisplay(): Display {
         digitB.show(text[1] ?? ' ');
       }
       digits.setAttribute('aria-label', `program ${value}`);
+    },
+    blinkProgram(times: number): void {
+      const count = Math.max(1, Math.round(times));
+      digits.classList.remove('blinking');
+      // Restart the animation even when it is already running.
+      void digits.offsetWidth;
+      digits.style.animationIterationCount = String(count);
+      digits.classList.add('blinking');
     },
     setLines(first: string, second: string): void {
       lineOne.textContent = fitLine(first, WIDE_LINE_COLUMNS);

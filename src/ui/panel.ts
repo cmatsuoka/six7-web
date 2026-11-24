@@ -36,11 +36,14 @@ const KEYBOARD_OCTAVES = 2;
 const MAX_VOLUME = 100;
 const MAX_SENSITIVITY = 100;
 const Q16_ONE = 65536;
+const STORE_BLINK_TIMES = 3;
 
 const LCD_INTERNAL_VOICE = 'INTERNAL VOICE';
 const LCD_MIDI_RECEIVED = ' MIDI RECEIVED';
 const LCD_CHECKSUM_ERROR = 'CHECK SUM ERROR!';
 const LCD_MIDI_DATA_ERROR = 'MIDI DATA ERROR!';
+const LCD_MEMORY_STORE = ' MEMORY STORE';
+const LCD_DELETE_BANK = `${' '.repeat(19)}DELETE BANK`;
 
 export interface Panel {
   showError(message: string): void;
@@ -172,6 +175,8 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   let storeMode = false;
   /** The internal memory position the pending store will write to. */
   let storeTarget = 0;
+  /** The delete operation is pending: the bank is waiting for a confirm. */
+  let deleteMode = false;
   const savedSensitivity = loadSensitivity();
   let sensitivity =
     typeof savedSensitivity === 'number'
@@ -276,12 +281,12 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   const leftButtons = document.createElement('div');
   leftButtons.className = 'left-buttons';
 
-  const abButton = document.createElement('button');
-  abButton.type = 'button';
-  abButton.className = 'button button-quiet bank-action-button ab-button';
-  abButton.textContent = 'A/B';
-  abButton.setAttribute('aria-label', 'cancel the pending store');
-  abButton.title = 'Cancel a pending store';
+  const okButton = document.createElement('button');
+  okButton.type = 'button';
+  okButton.className = 'button button-quiet bank-action-button ok-button';
+  okButton.textContent = 'OK';
+  okButton.setAttribute('aria-label', 'confirm the pending store');
+  okButton.title = 'Confirm a pending store';
 
   const engineButton = document.createElement('button');
   engineButton.type = 'button';
@@ -290,7 +295,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   engineButton.setAttribute('aria-label', 'cycle engine personality');
 
   engineButton.addEventListener('click', () => {
-    cancelStore();
+    cancelPending();
     const index = ENGINE_TYPES.indexOf(engineType);
     const next = ENGINE_TYPES[(index + 1) % ENGINE_TYPES.length] ?? ENGINE_DX7;
     engineType = next;
@@ -298,7 +303,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     renderPatchInfo();
   });
 
-  leftButtons.append(abButton, engineButton);
+  leftButtons.append(okButton, engineButton);
 
   const loadButton = document.createElement('button');
   loadButton.type = 'button';
@@ -318,7 +323,15 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   removeButton.textContent = 'DEL';
   removeButton.setAttribute('aria-label', 'delete bank');
 
-  bankButtonsWrap.append(loadButton, removeButton);
+  const removeSub = document.createElement('span');
+  removeSub.className = 'button-label-sublabel';
+  removeSub.textContent = 'CANCEL';
+
+  const removeWrap = document.createElement('div');
+  removeWrap.className = 'button-label-group del-group';
+  removeWrap.append(removeButton, removeSub);
+
+  bankButtonsWrap.append(loadButton, removeWrap);
 
   controls.append(fileInput);
 
@@ -414,6 +427,9 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
         storeTarget = slot;
         refreshPrograms();
         return;
+      }
+      if (deleteMode) {
+        cancelDelete();
       }
       selectProgram(slot);
     });
@@ -532,7 +548,23 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     const bank = currentBank();
     bankPrevButton.disabled = banks.length < 2;
     bankNextButton.disabled = banks.length < 2;
-    removeButton.disabled = bank.builtin === true || banks.length <= 1;
+    const canDelete = bank.builtin !== true && banks.length > 1;
+    const pending = storeMode || deleteMode;
+    removeButton.disabled = !pending && !canDelete;
+    removeButton.classList.toggle('lit', deleteMode);
+    removeButton.title = storeMode
+      ? 'Cancel the pending store'
+      : deleteMode
+        ? 'Press OK to confirm, or DEL to cancel'
+        : 'Delete bank';
+    removeButton.setAttribute(
+      'aria-label',
+      storeMode
+        ? 'cancel the pending store'
+        : deleteMode
+          ? 'confirm or cancel the bank deletion'
+          : 'delete bank',
+    );
   }
 
   function refreshPrograms(): void {
@@ -574,12 +606,12 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     );
     storeButton.classList.toggle('lit', storeMode);
     storeButton.title = storeMode
-      ? 'Store the voice in the selected internal memory position'
+      ? 'Press OK to confirm the store'
       : 'Store the voice in the internal memory';
     cancelLcdFlash();
     renderPatchInfo();
-    programPrevButton.disabled = bank.voices.length < 2;
-    programNextButton.disabled = bank.voices.length < 2;
+    programPrevButton.disabled = !storeMode && bank.voices.length < 2;
+    programNextButton.disabled = !storeMode && bank.voices.length < 2;
   }
 
   /**
@@ -606,7 +638,11 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
       : LCD_INTERNAL_VOICE;
     display.setLines(
       lcdLineOne,
-      `${prefix}${digits} ${name} ENG ${personality}`,
+      deleteMode
+        ? LCD_DELETE_BANK
+        : storeMode
+          ? LCD_MEMORY_STORE
+          : `${prefix}${digits} ${name} ENG ${personality}`,
     );
     display.setPatchDetails(
       voice === null
@@ -693,9 +729,10 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     }
     storeMode = true;
     storeTarget = program;
+    refreshBankControls();
     refreshPrograms();
     showNotice(
-      'STORE: pick an internal memory position, then press STORE again to confirm',
+      'STORE: pick a position, then press OK to confirm or any other button to cancel',
     );
   }
 
@@ -705,6 +742,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
       return;
     }
     storeMode = false;
+    refreshBankControls();
     refreshPrograms();
     showNotice('Store cancelled');
   }
@@ -712,12 +750,13 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   /** Write the sounding patch to the chosen internal memory position. */
   function confirmStore(): void {
     if (!storeMode) {
-      showNotice('Press STORE to store the voice in the internal memory');
+      showNotice('Press STORE to store the voice or DEL to delete the bank');
       return;
     }
     const voice = currentVoice();
     const slot = storeTarget;
     storeMode = false;
+    refreshBankControls();
     if (voice === null) {
       refreshPrograms();
       showError('There is no voice to store');
@@ -728,9 +767,55 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     // written becomes the active program.
     selectBank(starter.id);
     selectProgram(slot);
+    display.blinkProgram(STORE_BLINK_TIMES);
     showNotice(
       `Stored "${voice.name || 'unnamed'}" in internal memory ${slot + 1}`,
     );
+  }
+
+  /** Ask for a confirmation before deleting the selected bank. */
+  function beginDelete(): void {
+    const bank = currentBank();
+    if (bank.builtin === true || banks.length <= 1) {
+      return;
+    }
+    deleteMode = true;
+    refreshBankControls();
+    renderPatchInfo();
+    showNotice(
+      `Delete "${bank.name}"? Press OK to confirm or any other button to cancel`,
+    );
+  }
+
+  /** Abandon the pending delete; the bank is left in the library. */
+  function cancelDelete(): void {
+    if (!deleteMode) {
+      return;
+    }
+    deleteMode = false;
+    refreshBankControls();
+    renderPatchInfo();
+    showNotice('Delete cancelled');
+  }
+
+  /** Delete the selected bank after the confirmation. */
+  function confirmDelete(): void {
+    if (!deleteMode) {
+      return;
+    }
+    deleteMode = false;
+    removeCurrentBank();
+  }
+
+  /** Cancel whichever operation is waiting for a confirmation. */
+  function cancelPending(): void {
+    if (storeMode) {
+      cancelStore();
+      return;
+    }
+    if (deleteMode) {
+      cancelDelete();
+    }
   }
 
   function setVolume(percent: number): void {
@@ -1118,19 +1203,19 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   }
 
   bankPrevButton.addEventListener('click', () => {
-    cancelStore();
+    cancelPending();
     stepBank(-1);
   });
   bankNextButton.addEventListener('click', () => {
-    cancelStore();
+    cancelPending();
     stepBank(1);
   });
   loadButton.addEventListener('click', () => {
-    cancelStore();
+    cancelPending();
     fileInput.click();
   });
   midiConnect.addEventListener('click', () => {
-    cancelStore();
+    cancelPending();
     void midi.connect().then(() => {
       if (midi.connected) {
         midiConnect.textContent = 'MIDI connected';
@@ -1151,45 +1236,72 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     fileInput.value = '';
   });
   normalizeButton.addEventListener('click', () => {
-    cancelStore();
+    cancelPending();
     setNormalizeOutput(!normalizeOutput);
   });
   storeButton.addEventListener('click', () => {
     if (storeMode) {
-      confirmStore();
+      cancelStore();
+      return;
+    }
+    if (deleteMode) {
+      cancelDelete();
       return;
     }
     beginStore();
   });
-  abButton.addEventListener('click', () => {
+  okButton.addEventListener('click', () => {
+    if (deleteMode) {
+      confirmDelete();
+      return;
+    }
+    confirmStore();
+  });
+  removeButton.addEventListener('click', () => {
     if (storeMode) {
       cancelStore();
       return;
     }
-    showNotice('Press STORE to store the voice in the internal memory');
-  });
-  removeButton.addEventListener('click', () => {
-    cancelStore();
-    removeCurrentBank();
+    if (deleteMode) {
+      cancelDelete();
+      return;
+    }
+    beginDelete();
   });
   programPrevButton.addEventListener('click', () => {
-    cancelStore();
+    if (deleteMode) {
+      cancelDelete();
+    }
+    if (storeMode) {
+      const length = starter.voices.length;
+      storeTarget = (storeTarget - 1 + length) % length;
+      refreshPrograms();
+      return;
+    }
     const bank = currentBank();
     selectProgram((program - 1 + bank.voices.length) % bank.voices.length);
   });
   programNextButton.addEventListener('click', () => {
-    cancelStore();
+    if (deleteMode) {
+      cancelDelete();
+    }
+    if (storeMode) {
+      const length = starter.voices.length;
+      storeTarget = (storeTarget + 1) % length;
+      refreshPrograms();
+      return;
+    }
     const bank = currentBank();
     selectProgram((program + 1) % bank.voices.length);
   });
   octaveDown.addEventListener('click', () => {
-    cancelStore();
+    cancelPending();
     allNotesOff();
     keyboard.setOctave(keyboard.octave - 1);
     buildPiano();
   });
   octaveUp.addEventListener('click', () => {
-    cancelStore();
+    cancelPending();
     allNotesOff();
     keyboard.setOctave(keyboard.octave + 1);
     buildPiano();

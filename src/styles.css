@@ -235,7 +235,7 @@ body {
   color: #a8d68a;
 }
 
-.button.bank-action-button.ab-button {
+.button.bank-action-button.ok-button {
   color: #cbd6a4;
 }
 
@@ -249,6 +249,34 @@ body {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.65),
     0 0 8px rgba(168, 214, 138, 0.55);
+}
+
+.button-label-group {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.button-label-group.del-group {
+  margin-left: 8px;
+}
+
+.button-label-group .bank-action-button {
+  margin-left: 0;
+}
+
+.button-label-sublabel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  color: #a9ada5;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .display-cluster {
@@ -285,6 +313,20 @@ body {
   display: flex;
   gap: 10px;
   height: 66px;
+}
+
+.seven-segment.blinking {
+  animation: program-blink 250ms ease-in-out;
+}
+
+@keyframes program-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.1;
+  }
 }
 
 .digit {
@@ -447,13 +489,12 @@ body {
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.28);
 }
 
-.button:focus-visible,
-.bank-select:focus-visible,
-.program-button:focus-visible,
-.piano-key:focus-visible,
-.knob:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+.button:focus,
+.bank-select:focus,
+.program-button:focus,
+.piano-key:focus,
+.knob:focus {
+  outline: none;
 }
 
 .button:disabled {
