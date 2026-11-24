@@ -31,6 +31,46 @@ import { parseSysex, voiceAlgorithm } from './sysex';
 import { loadBanks, saveBanks, loadInternalMemory, saveInternalMemory, loadSensitivity, scheduleSensitivitySave, cancelSensitivitySave } from './storage';
 
 const PROGRAM_BUTTON_COUNT = BANK_VOICE_COUNT;
+
+/**
+ * The parameter each program key will edit once program editing exists.
+ * They are a preview of the edit layout: keys 1–6 select the operator and
+ * 7–32 select the parameter page (DX7 Mk1 numbering).
+ */
+const PROGRAM_KEY_LABELS: readonly string[] = [
+  'OP1',
+  'OP2',
+  'OP3',
+  'OP4',
+  'OP5',
+  'OP6',
+  'ALG',
+  'FDBK',
+  'LFO WAV',
+  'LFO SPD',
+  'LFO DLY',
+  'LFO PMD',
+  'LFO AMD',
+  'LFO SYN',
+  'PM SENS',
+  'AM SENS',
+  'OSC MODE',
+  'COARSE',
+  'FINE',
+  'DETUNE',
+  'EG RATE',
+  'EG LVL',
+  'BRK PT',
+  'SCL CRV',
+  'SCL DEP',
+  'RATE SCL',
+  'OUTPUT',
+  'KEY VEL',
+  'PEG RATE',
+  'PEG LVL',
+  'MID C',
+  'NAME',
+];
 const ENGINE_TYPES: readonly EngineType[] = [ENGINE_DX7, ENGINE_DX7S];
 const KEYBOARD_OCTAVES = 2;
 const MAX_VOLUME = 100;
@@ -425,7 +465,16 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   programGrid.setAttribute('aria-label', 'programs');
 
   const programButtons: HTMLButtonElement[] = [];
+  const programKeys: HTMLDivElement[] = [];
   for (let slot = 0; slot < PROGRAM_BUTTON_COUNT; slot += 1) {
+    const key = document.createElement('div');
+    key.className = 'program-key';
+
+    const keyLabel = document.createElement('span');
+    keyLabel.className = 'program-key-label';
+    keyLabel.setAttribute('aria-hidden', 'true');
+    keyLabel.textContent = PROGRAM_KEY_LABELS[slot] ?? '';
+
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'program-button';
@@ -442,7 +491,9 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
       selectProgram(slot);
     });
     programButtons.push(button);
-    programGrid.append(button);
+    programKeys.push(key);
+    key.append(keyLabel, button);
+    programGrid.append(key);
   }
   programGrid.addEventListener(
     'wheel',
@@ -577,17 +628,20 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
 
   function refreshPrograms(): void {
     const bank = currentBank();
+    programGrid.classList.toggle('store-mode', storeMode);
     programButtons.forEach((button, slot) => {
       const voice = bank.voices[slot];
+      programKeys[slot]?.toggleAttribute(
+        'hidden',
+        !storeMode && voice === undefined,
+      );
       if (storeMode) {
         // Every internal memory position is offered, not only the ones the
         // current bank happens to hold.
-        button.hidden = false;
         button.disabled = false;
         button.title = `internal memory position ${slot + 1}`;
         button.setAttribute('aria-label', `internal memory position ${slot + 1}`);
       } else {
-        button.hidden = voice === undefined;
         button.disabled = voice === undefined;
         button.title = voice === undefined ? '' : voice.name;
         button.setAttribute(
