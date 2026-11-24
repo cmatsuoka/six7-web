@@ -1066,6 +1066,12 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     onModulation: (value) => {
       engine.setModulation(value);
     },
+    onVolume: (value) => {
+      setVolume((value / 127) * MAX_VOLUME);
+    },
+    onSensitivity: (value) => {
+      setSensitivity((value / 127) * MAX_SENSITIVITY);
+    },
     onSustain: (on) => {
       engine.setSustain(on);
     },

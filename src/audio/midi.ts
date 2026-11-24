@@ -18,6 +18,8 @@ export interface MidiHandlers {
   onNoteOff(note: number): void;
   onPitchBend(value: number): void;
   onModulation(value: number): void;
+  onVolume(value: number): void;
+  onSensitivity(value: number): void;
   onSustain(on: boolean): void;
   onAllNotesOff(): void;
   onDevices(devices: MidiDevice[]): void;
@@ -190,6 +192,10 @@ export class MidiInput {
       case 0xb0: {
         if (first === 1) {
           this.handlers.onModulation(second);
+        } else if (first === 7) {
+          this.handlers.onVolume(second);
+        } else if (first === 20) {
+          this.handlers.onSensitivity(second);
         } else if (first === 64) {
           this.handlers.onSustain(second >= 64);
         } else if (first === 123 || first === 120) {
