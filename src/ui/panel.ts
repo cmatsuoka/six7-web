@@ -284,9 +284,17 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   const okButton = document.createElement('button');
   okButton.type = 'button';
   okButton.className = 'button button-quiet bank-action-button ok-button';
-  okButton.textContent = 'OK';
-  okButton.setAttribute('aria-label', 'confirm the pending store');
-  okButton.title = 'Confirm a pending store';
+  okButton.textContent = 'EDIT';
+  okButton.setAttribute('aria-label', 'edit voice');
+  okButton.title = 'Edit the current voice';
+
+  const okSub = document.createElement('span');
+  okSub.className = 'button-label-sublabel';
+  okSub.textContent = 'OK';
+
+  const okWrap = document.createElement('div');
+  okWrap.className = 'button-label-group ok-group';
+  okWrap.append(okButton, okSub);
 
   const engineButton = document.createElement('button');
   engineButton.type = 'button';
@@ -303,7 +311,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     renderPatchInfo();
   });
 
-  leftButtons.append(okButton, engineButton);
+  leftButtons.append(okWrap, engineButton);
 
   const loadButton = document.createElement('button');
   loadButton.type = 'button';
