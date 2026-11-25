@@ -10,7 +10,10 @@ import {
 } from './bank';
 import {
   BANK_VOICE_COUNT,
+  ENGINE_DX7,
+  ENGINE_DX7S,
   VOICE_DUMP_SIZE,
+  type EngineType,
   type VoiceExtensions,
 } from '../audio/protocol';
 
@@ -192,69 +195,83 @@ function decodeExtensions(value: unknown): VoiceExtensions | undefined {
 }
 
 const SETTINGS_KEY = 'six7.settings.v1';
+
+/** The panel settings that survive a reload. A missing field is a default. */
 export interface StoredSettings {
-  sensitivity: number;
+  sensitivity?: number;
+  engineType?: EngineType;
+  normalize?: boolean;
 }
 
-export function loadSensitivity(): number | null {
+/** Read the persisted settings, discarding any field that is malformed. */
+export function loadSettings(): StoredSettings {
   const raw = read(SETTINGS_KEY);
   if (raw === null) {
-    return null;
+    return {};
   }
+
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    return null;
+    remove(SETTINGS_KEY);
+    return {};
   }
-  if (
-    typeof parsed !== 'object' ||
-    parsed === null ||
-    !('sensitivity' in parsed) ||
-    typeof (parsed as StoredSettings).sensitivity !== 'number'
-  ) {
-    return null;
+  if (typeof parsed !== 'object' || parsed === null) {
+    remove(SETTINGS_KEY);
+    return {};
   }
-  return (parsed as StoredSettings).sensitivity;
+
+  const entry = parsed as Record<string, unknown>;
+  const settings: StoredSettings = {};
+  if (typeof entry.sensitivity === 'number' && Number.isFinite(entry.sensitivity)) {
+    settings.sensitivity = entry.sensitivity;
+  }
+  if (entry.engineType === ENGINE_DX7 || entry.engineType === ENGINE_DX7S) {
+    settings.engineType = entry.engineType;
+  }
+  if (typeof entry.normalize === 'boolean') {
+    settings.normalize = entry.normalize;
+  }
+  return settings;
 }
 
-let sensitivitySaveTimer: ReturnType<typeof setTimeout> | null = null;
-
-export function scheduleSensitivitySave(value: number): void {
-  if (sensitivitySaveTimer !== null) {
-    clearTimeout(sensitivitySaveTimer);
+/** Merge a patch of settings into the stored ones. */
+function writeSettings(patch: StoredSettings): void {
+  const settings: StoredSettings = { ...loadSettings(), ...patch };
+  if (
+    settings.sensitivity === undefined &&
+    settings.engineType === undefined &&
+    settings.normalize === undefined
+  ) {
+    remove(SETTINGS_KEY);
+    return;
   }
-  sensitivitySaveTimer = setTimeout(() => {
-    sensitivitySaveTimer = null;
-    try {
-      const raw = read(SETTINGS_KEY);
-      let settings: StoredSettings = { sensitivity: value };
-      if (raw !== null) {
-        try {
-          const parsed = JSON.parse(raw);
-          if (
-            typeof parsed === 'object' &&
-            parsed !== null &&
-            'sensitivity' in parsed
-          ) {
-            settings = parsed as StoredSettings;
-          }
-        } catch {
-          // Start fresh on malformed data.
-        }
-      }
-      settings.sensitivity = value;
-      write(SETTINGS_KEY, JSON.stringify(settings));
-    } catch {
-      // Nothing we can do.
-    }
+  write(SETTINGS_KEY, JSON.stringify(settings));
+}
+
+/** Persist a patch of settings immediately. */
+export function saveSettings(patch: StoredSettings): void {
+  writeSettings(patch);
+}
+
+let settingsSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Persist a patch of settings, coalescing quick changes such as a knob. */
+export function scheduleSettingsSave(patch: StoredSettings): void {
+  if (settingsSaveTimer !== null) {
+    clearTimeout(settingsSaveTimer);
+  }
+  settingsSaveTimer = setTimeout(() => {
+    settingsSaveTimer = null;
+    writeSettings(patch);
   }, 500);
 }
 
-export function cancelSensitivitySave(): void {
-  if (sensitivitySaveTimer !== null) {
-    clearTimeout(sensitivitySaveTimer);
-    sensitivitySaveTimer = null;
+export function cancelSettingsSave(): void {
+  if (settingsSaveTimer !== null) {
+    clearTimeout(settingsSaveTimer);
+    settingsSaveTimer = null;
   }
 }
 

@@ -28,7 +28,7 @@ import {
 import { createDisplay } from './display';
 import { MidiInput, type MidiDevice } from '../audio/midi';
 import { parseSysex, voiceAlgorithm } from './sysex';
-import { loadBanks, saveBanks, loadInternalMemory, saveInternalMemory, loadSensitivity, scheduleSensitivitySave, cancelSensitivitySave } from './storage';
+import { loadBanks, saveBanks, loadInternalMemory, saveInternalMemory, loadSettings, saveSettings, scheduleSettingsSave, cancelSettingsSave } from './storage';
 
 const PROGRAM_BUTTON_COUNT = BANK_VOICE_COUNT;
 
@@ -217,17 +217,18 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   let storeTarget = 0;
   /** The delete operation is pending: the bank is waiting for a confirm. */
   let deleteMode = false;
-  const savedSensitivity = loadSensitivity();
+  const savedSettings = loadSettings();
+  const savedSensitivity = savedSettings.sensitivity;
   let sensitivity =
     typeof savedSensitivity === 'number'
       ? Math.max(0, Math.min(MAX_SENSITIVITY, savedSensitivity))
       : MAX_SENSITIVITY;
+  let engineType: EngineType = savedSettings.engineType ?? ENGINE_DX7;
+  let normalizeOutput = savedSettings.normalize === true;
   let messageTimer: ReturnType<typeof setTimeout> | null = null;
   let lcdTimer: ReturnType<typeof setTimeout> | null = null;
   let lastWheelStep = 0;
   let lcdLineOne = starter.name;
-  let engineType: EngineType = ENGINE_DX7;
-  let normalizeOutput = false;
 
   const display = createDisplay();
 
@@ -348,6 +349,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     const next = ENGINE_TYPES[(index + 1) % ENGINE_TYPES.length] ?? ENGINE_DX7;
     engineType = next;
     engine.setEngineType(engineType);
+    saveSettings({ engineType });
     renderPatchInfo();
   });
 
@@ -894,6 +896,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     normalizeButton.setAttribute('aria-pressed', on ? 'true' : 'false');
     normalizeButton.classList.toggle('lit', on && engineType === ENGINE_DX7S);
     engine.setDigitalOutputGain(on);
+    saveSettings({ normalize: on });
   }
 
   function setSensitivity(percent: number): void {
@@ -905,7 +908,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     sensitivityKnob.dial.style.setProperty('--knob-angle', `${angle}deg`);
     sensitivityKnob.element.setAttribute('aria-valuenow', String(sensitivity));
     sensitivityKnob.element.setAttribute('aria-valuetext', `${sensitivity}%`);
-    scheduleSensitivitySave(sensitivity);
+    scheduleSettingsSave({ sensitivity });
   }
 
   function maximumVelocity(): number {
@@ -1391,6 +1394,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   buildPiano();
   setVolume(volume);
   setSensitivity(sensitivity);
+  engine.setEngineType(engineType);
   setNormalizeOutput(normalizeOutput);
   const initialBank = freshCurrentBank();
   const initial = initialBank.voices[program] ?? null;
@@ -1416,7 +1420,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   window.addEventListener('beforeunload', () => {
     keyboard.dispose();
     midi.disconnect();
-    cancelSensitivitySave();
+    cancelSettingsSave();
   });
 
   return { showError, showNotice, handleFiles };
