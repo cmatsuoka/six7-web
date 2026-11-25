@@ -26,6 +26,7 @@ import {
   noteName,
   type ComputerKeyboard,
 } from './computer-keyboard';
+import { createAlgorithmDiagram } from './algorithm-diagram';
 import { createDisplay } from './display';
 import { createEditView, editSubGroup, type EditView } from './edit';
 import { MidiInput, type MidiDevice } from '../audio/midi';
@@ -246,6 +247,8 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   let lcdLineOne = starter.name;
 
   const display = createDisplay();
+  const algorithmDiagram = createAlgorithmDiagram();
+  display.algorithmHost.append(algorithmDiagram.element);
 
   const machine = document.createElement('section');
   machine.className = 'machine';
@@ -978,10 +981,27 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   }
 
   /**
+   * The topology chart belongs to the algorithm-selection page only; the
+   * other edit pages leave the space to the LCD.
+   */
+  function updateAlgorithmDiagram(): void {
+    if (!editMode || selectedPage !== 7 || editBuffer === null) {
+      algorithmDiagram.setAlgorithm(null);
+      display.setAlgorithmOpen(false);
+      return;
+    }
+    const visible = algorithmDiagram.setAlgorithm(
+      voiceAlgorithm(editBuffer.data),
+    );
+    display.setAlgorithmOpen(visible);
+  }
+
+  /**
    * The bank's name on the first line, and the source prefix, program
    * number, ten-character patch name and engine personality on the second.
    */
   function renderPatchInfo(): void {
+    updateAlgorithmDiagram();
     const available = engineType === ENGINE_DX7S;
     normalizeButton.disabled = !available;
     normalizeButton.title = available

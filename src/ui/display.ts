@@ -57,6 +57,10 @@ export interface PatchDetails {
 
 export interface Display {
   readonly element: HTMLElement;
+  /** The right-hand part of the LCD, where the algorithm chart is drawn. */
+  readonly algorithmHost: HTMLElement;
+  /** Reserve the LCD's right side for the algorithm chart. */
+  setAlgorithmOpen(open: boolean): void;
   /** Show a 1-based program number, or blank both digits. */
   setProgram(program: number | null): void;
   /** Blink the program digits a number of times. */
@@ -108,13 +112,21 @@ export function createDisplay(): Display {
   lineTwo.className = 'lcd-line';
   const detail = document.createElement('div');
   detail.className = 'lcd-detail';
-  lcd.append(lineOne, lineTwo, detail);
+
+  const algorithmHost = document.createElement('div');
+  algorithmHost.className = 'lcd-algorithm';
+
+  lcd.append(lineOne, lineTwo, detail, algorithmHost);
   lcdShell.append(lcd);
 
   element.append(led, lcdShell);
 
   return {
     element,
+    algorithmHost,
+    setAlgorithmOpen(open: boolean): void {
+      lcd.classList.toggle('has-algorithm', open);
+    },
     setProgram(program: number | null): void {
       if (program === null || !Number.isFinite(program)) {
         digitA.show(' ');
