@@ -317,7 +317,15 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   bankNextButton.setAttribute('aria-label', 'next bank');
   bankNextButton.textContent = '+';
 
-  bankButtonsWrap.append(bankPrevButton, bankLabel, bankNextButton);
+  const bankNavGroup = document.createElement('div');
+  bankNavGroup.className = 'bank-nav-group';
+
+  const bankNavSub = document.createElement('span');
+  bankNavSub.className = 'button-label-sublabel bank-nav-sublabel';
+  bankNavSub.textContent = 'OPERATOR SELECT';
+
+  bankNavGroup.append(bankPrevButton, bankLabel, bankNextButton, bankNavSub);
+  bankButtonsWrap.append(bankNavGroup);
 
   const displayBezel = document.createElement('div');
   displayBezel.className = 'display-bezel';
@@ -859,8 +867,18 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
 
   function refreshBankControls(): void {
     const bank = currentBank();
-    bankPrevButton.disabled = banks.length < 2;
-    bankNextButton.disabled = banks.length < 2;
+    bankPrevButton.disabled = !editMode && banks.length < 2;
+    bankNextButton.disabled = !editMode && banks.length < 2;
+    bankPrevButton.title = editMode ? 'previous operator' : 'previous bank';
+    bankNextButton.title = editMode ? 'next operator' : 'next bank';
+    bankPrevButton.setAttribute(
+      'aria-label',
+      editMode ? 'previous operator' : 'previous bank',
+    );
+    bankNextButton.setAttribute(
+      'aria-label',
+      editMode ? 'next operator' : 'next bank',
+    );
     const canDelete = bank.builtin !== true && banks.length > 1;
     const pending = storeMode || deleteMode;
     removeButton.disabled = !pending && !canDelete;
@@ -970,13 +988,19 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
       ? 'Normalize the DX7S output gain to the DX7 level'
       : 'Output gain normalization is a DX7S feature';
     normalizeButton.classList.toggle('lit', available && normalizeOutput);
-    renderPatchDetails();
     if (editMode) {
+      const bank = currentBank();
+      const prefix = bank.builtin !== true ? 'CRT' : 'INT';
+      const name = (currentVoice()?.name ?? '').slice(0, 10);
+      display.setDetailText(
+        `EDIT ${prefix} ${program + 1} ${name}`.trimEnd(),
+      );
       const view = currentEditView();
       lcdLineOne = view?.lineOne ?? 'ALG';
       display.setLines(lcdLineOne, view?.lineTwo ?? '');
       return;
     }
+    renderPatchDetails();
     const bank = currentBank();
     const voice = currentVoice();
     const cartridge = bank.builtin !== true;
@@ -1067,6 +1091,16 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     if (bank !== undefined) {
       selectBank(bank.id);
     }
+  }
+
+  function stepEditOperator(delta: number): void {
+    if (!editMode) {
+      return;
+    }
+    selectedOperator = (selectedOperator - delta + 6) % 6;
+    refreshPrograms();
+    refreshEntryKnob();
+    showNotice(`Selected OP${6 - selectedOperator}`);
   }
 
   /**
@@ -1566,10 +1600,18 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
 
   bankPrevButton.addEventListener('click', () => {
     cancelPending();
+    if (editMode) {
+      stepEditOperator(-1);
+      return;
+    }
     stepBank(-1);
   });
   bankNextButton.addEventListener('click', () => {
     cancelPending();
+    if (editMode) {
+      stepEditOperator(1);
+      return;
+    }
     stepBank(1);
   });
   loadButton.addEventListener('click', () => {

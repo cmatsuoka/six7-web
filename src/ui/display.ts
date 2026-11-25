@@ -65,6 +65,8 @@ export interface Display {
   setLines(first: string, second: string): void;
   /** Show the current voice's algorithm, PEG depth and key mode. */
   setPatchDetails(details: PatchDetails | null): void;
+  /** Set arbitrary text on the detail line. */
+  setDetailText(text: string): void;
 }
 
 export function createDisplay(): Display {
@@ -149,6 +151,10 @@ export function createDisplay(): Display {
     setPatchDetails(details: PatchDetails | null): void {
       detail.textContent =
         details === null ? '' : formatPatchDetails(details);
+      updateAria();
+    },
+    setDetailText(text: string): void {
+      detail.textContent = text;
       updateAria();
     },
   };
