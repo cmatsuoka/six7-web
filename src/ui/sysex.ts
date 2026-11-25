@@ -436,6 +436,7 @@ export function createInitVoice(slot: number): Uint8Array {
   dump[134] = 0;
   dump[136] = 1;
   dump[144] = 24;
+  dump[155] = 0x3f;
 
   const name = `INIT ${String(slot + 1).padStart(2, '0')}`;
   for (let i = 0; i < VOICE_NAME_LENGTH; i += 1) {

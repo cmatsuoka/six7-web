@@ -6,6 +6,7 @@ import {
   ENGINE_DX7S,
   KEY_POLY,
   PEG_RANGE_8_OCTAVES,
+  VOICE_NAME_LENGTH,
   formatEngineType,
   formatVersion,
   type EngineType,
@@ -26,16 +27,16 @@ import {
   type ComputerKeyboard,
 } from './computer-keyboard';
 import { createDisplay } from './display';
+import { createEditView, editSubGroup, type EditView } from './edit';
 import { MidiInput, type MidiDevice } from '../audio/midi';
-import { parseSysex, voiceAlgorithm } from './sysex';
+import { parseSysex, voiceAlgorithm, voiceName } from './sysex';
 import { loadBanks, saveBanks, loadInternalMemory, saveInternalMemory, loadSettings, saveSettings, scheduleSettingsSave, cancelSettingsSave } from './storage';
 
 const PROGRAM_BUTTON_COUNT = BANK_VOICE_COUNT;
 
 /**
- * The parameter each program key will edit once program editing exists.
- * They are a preview of the edit layout: keys 1–6 select the operator and
- * 7–32 select the parameter page (DX7 Mk1 numbering).
+ * The parameter each program key edits in edit mode. Keys 1–6 select the
+ * operator and 7–32 select the parameter page (DX7 Mk1 numbering).
  */
 const PROGRAM_KEY_LABELS: readonly string[] = [
   'OP1',
@@ -77,6 +78,7 @@ const MAX_VOLUME = 100;
 const MAX_SENSITIVITY = 100;
 const Q16_ONE = 65536;
 const STORE_BLINK_TIMES = 3;
+const OPERATOR_HOLD_MS = 600;
 
 const LCD_INTERNAL_VOICE = 'INTERNAL VOICE';
 const LCD_MIDI_RECEIVED = ' MIDI RECEIVED';
@@ -96,6 +98,7 @@ interface KnobOptions {
   label: string;
   ariaLabel: string;
   max: number;
+  getMax?: () => number;
   getValue: () => number;
   setValue: (value: number) => void;
 }
@@ -104,9 +107,11 @@ interface KnobControl {
   wrap: HTMLDivElement;
   element: HTMLDivElement;
   dial: HTMLDivElement;
+  label: HTMLSpanElement;
 }
 
 function createKnob(options: KnobOptions): KnobControl {
+  const maxValue = (): number => options.getMax?.() ?? options.max;
   const wrap = document.createElement('div');
   wrap.className = 'knob-wrap';
 
@@ -117,7 +122,7 @@ function createKnob(options: KnobOptions): KnobControl {
   element.setAttribute('role', 'slider');
   element.setAttribute('aria-label', options.ariaLabel);
   element.setAttribute('aria-valuemin', '0');
-  element.setAttribute('aria-valuemax', String(options.max));
+  element.setAttribute('aria-valuemax', String(maxValue()));
   element.setAttribute('aria-valuenow', String(options.getValue()));
 
   const dial = document.createElement('div');
@@ -151,7 +156,8 @@ function createKnob(options: KnobOptions): KnobControl {
       return;
     }
     event.preventDefault();
-    const delta = ((dragStartY - event.clientY) / 160) * options.max;
+    const range = maxValue();
+    const delta = ((dragStartY - event.clientY) / 160) * Math.max(range, 7);
     options.setValue(dragStartValue + delta);
   });
   const endDrag = (event: PointerEvent): void => {
@@ -192,7 +198,7 @@ function createKnob(options: KnobOptions): KnobControl {
         options.setValue(0);
         break;
       case 'End':
-        options.setValue(options.max);
+        options.setValue(maxValue());
         break;
       default:
         return;
@@ -200,7 +206,7 @@ function createKnob(options: KnobOptions): KnobControl {
     event.preventDefault();
   });
 
-  return { wrap, element, dial };
+  return { wrap, element, dial, label };
 }
 
 export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
@@ -225,6 +231,15 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
       : MAX_SENSITIVITY;
   let engineType: EngineType = savedSettings.engineType ?? ENGINE_DX7;
   let normalizeOutput = savedSettings.normalize === true;
+  let editMode = false;
+  let editBuffer: Voice | null = null;
+  let selectedOperator = 5;
+  let selectedPage: number | null = null;
+  let activeEditKey = 7;
+  let oscSub = 1;
+  let egSub = 3;
+  let scaleSub = 1;
+  let nameCursor = VOICE_NAME_LENGTH - 1;
   let messageTimer: ReturnType<typeof setTimeout> | null = null;
   let lcdTimer: ReturnType<typeof setTimeout> | null = null;
   let lastWheelStep = 0;
@@ -425,8 +440,9 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     label: 'SENS',
     ariaLabel: 'velocity sensitivity',
     max: MAX_SENSITIVITY,
-    getValue: () => sensitivity,
-    setValue: (value) => setSensitivity(value),
+    getMax: () => entryKnobMax(),
+    getValue: () => entryKnobValue(),
+    setValue: (value) => setEntryKnobValue(value),
   });
 
   const normalizeButton = document.createElement('button');
@@ -468,6 +484,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
 
   const programButtons: HTMLButtonElement[] = [];
   const programKeys: HTMLDivElement[] = [];
+  let operatorHoldHandled = false;
   for (let slot = 0; slot < PROGRAM_BUTTON_COUNT; slot += 1) {
     const key = document.createElement('div');
     key.className = 'program-key';
@@ -490,8 +507,46 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
       if (deleteMode) {
         cancelDelete();
       }
+      if (editMode) {
+        if (slot < 6) {
+          if (operatorHoldHandled) {
+            operatorHoldHandled = false;
+            return;
+          }
+          toggleOperator(slot + 1);
+          return;
+        }
+        selectEditButton(slot + 1);
+        return;
+      }
       selectProgram(slot);
     });
+    if (slot < 6) {
+      let holdTimer: ReturnType<typeof setTimeout> | null = null;
+      const cancelHold = (): void => {
+        if (holdTimer !== null) {
+          clearTimeout(holdTimer);
+          holdTimer = null;
+        }
+      };
+      button.addEventListener('pointerdown', (event) => {
+        operatorHoldHandled = false;
+        if (!editMode) {
+          return;
+        }
+        if (event.pointerType === 'mouse' && event.button !== 0) {
+          return;
+        }
+        holdTimer = setTimeout(() => {
+          holdTimer = null;
+          operatorHoldHandled = true;
+          selectEditOperator(slot + 1);
+        }, OPERATOR_HOLD_MS);
+      });
+      button.addEventListener('pointerup', cancelHold);
+      button.addEventListener('pointerleave', cancelHold);
+      button.addEventListener('pointercancel', cancelHold);
+    }
     programButtons.push(button);
     programKeys.push(key);
     key.append(keyLabel, button);
@@ -500,7 +555,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   programGrid.addEventListener(
     'wheel',
     (event) => {
-      if (storeMode || event.deltaY === 0) {
+      if (storeMode || editMode || event.deltaY === 0) {
         return;
       }
       event.preventDefault();
@@ -588,8 +643,205 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   }
 
   function currentVoice() {
+    if (editBuffer !== null) {
+      return editBuffer;
+    }
     const bank = currentBank();
     return bank.voices[program] ?? null;
+  }
+
+  function sendVoice(voice: Voice): void {
+    const status = voice.data[155] ?? 0x3f;
+    if (status === 0x3f) {
+      engine.setVoice(voice.data, voice.extensions);
+      return;
+    }
+    const data = voice.data.slice();
+    for (let block = 0; block < 6; block += 1) {
+      if (((status >> block) & 1) === 0) {
+        data[block * 21 + 16] = 0;
+      }
+    }
+    engine.setVoice(data, voice.extensions);
+  }
+
+  function currentSub(button: number): number {
+    switch (editSubGroup(button)) {
+      case 'osc':
+        return oscSub;
+      case 'eg':
+        return egSub;
+      case 'scale':
+        return scaleSub;
+      default:
+        return 0;
+    }
+  }
+
+  function currentEditView(): EditView | null {
+    if (!editMode || editBuffer === null || selectedPage === null) {
+      return null;
+    }
+    return createEditView(
+      selectedPage,
+      currentSub(selectedPage),
+      selectedOperator,
+      editBuffer.data,
+      nameCursor,
+    );
+  }
+
+  function entryKnobMax(): number {
+    if (!editMode) {
+      return MAX_SENSITIVITY;
+    }
+    return currentEditView()?.max ?? 0;
+  }
+
+  function entryKnobValue(): number {
+    if (!editMode) {
+      return sensitivity;
+    }
+    return currentEditView()?.value ?? 0;
+  }
+
+  function setEntryKnobValue(value: number): void {
+    if (!editMode) {
+      setSensitivity(value);
+      return;
+    }
+    applyEditValue(value);
+  }
+
+  function refreshEntryKnob(): void {
+    const max = entryKnobMax();
+    const value = entryKnobValue();
+    sensitivityKnob.element.setAttribute(
+      'aria-label',
+      editMode ? 'data entry' : 'velocity sensitivity',
+    );
+    sensitivityKnob.element.setAttribute('aria-valuemax', String(max));
+    sensitivityKnob.element.setAttribute('aria-valuenow', String(value));
+    const angle =
+      max > 0
+        ? -135 + (Math.max(0, Math.min(max, value)) / max) * 270
+        : -135;
+    sensitivityKnob.dial.style.setProperty('--knob-angle', `${angle}deg`);
+    sensitivityKnob.element.setAttribute(
+      'aria-valuetext',
+      editMode
+        ? (currentEditView()?.valueText ?? '')
+        : `${value}%`,
+    );
+  }
+
+  function selectEditButton(button: number): void {
+    selectedPage = button;
+    switch (editSubGroup(button)) {
+      case 'osc':
+        oscSub = (oscSub + 1) % 2;
+        break;
+      case 'eg':
+        egSub = (egSub + 1) % 4;
+        break;
+      case 'scale':
+        scaleSub = (scaleSub + 1) % 2;
+        break;
+      default:
+        break;
+    }
+    if (button === 32) {
+      nameCursor = (nameCursor + 1) % VOICE_NAME_LENGTH;
+    }
+    activeEditKey = button;
+    refreshPrograms();
+    refreshEntryKnob();
+  }
+
+  function selectEditOperator(buttonNumber: number): void {
+    if (!editMode) {
+      return;
+    }
+    selectedOperator = 6 - buttonNumber;
+    activeEditKey = buttonNumber;
+    refreshPrograms();
+    refreshEntryKnob();
+    showNotice(`Selected OP${buttonNumber}`);
+  }
+
+  function toggleOperator(buttonNumber: number): void {
+    if (!editMode || editBuffer === null) {
+      return;
+    }
+    const data = editBuffer.data.slice();
+    const mask = 1 << (6 - buttonNumber);
+    const status = (data[155] ?? 0x3f) ^ mask;
+    data[155] = status;
+    editBuffer = {
+      data,
+      name: voiceName(data),
+      extensions: editBuffer.extensions,
+    };
+    sendVoice(editBuffer);
+    activeEditKey = buttonNumber;
+    refreshPrograms();
+    refreshEntryKnob();
+    showNotice(`OP${buttonNumber} ${(status & mask) !== 0 ? 'ON' : 'OFF'}`);
+  }
+
+  function applyEditValue(value: number): void {
+    const view = currentEditView();
+    if (view === null || editBuffer === null) {
+      return;
+    }
+    const clamped = Math.max(0, Math.min(view.max, Math.round(value)));
+    const data = editBuffer.data.slice();
+    data[view.offset] =
+      view.kind === 'name' ? (clamped + 32) & 0x7f : clamped;
+    editBuffer = {
+      data,
+      name: voiceName(data),
+      extensions: editBuffer.extensions,
+    };
+    sendVoice(editBuffer);
+    renderPatchInfo();
+    refreshEntryKnob();
+  }
+
+  function enterEditMode(): void {
+    const voice = currentVoice();
+    if (voice === null) {
+      showError('There is no voice to edit');
+      return;
+    }
+    if (editBuffer === null) {
+      editBuffer = {
+        data: voice.data.slice(),
+        name: voice.name,
+        extensions:
+          voice.extensions === undefined ? undefined : { ...voice.extensions },
+      };
+    }
+    editMode = true;
+    if (selectedPage === null) {
+      selectedPage = 7;
+    }
+    refreshBankControls();
+    refreshPrograms();
+    refreshEntryKnob();
+    showNotice(
+      'Edit mode: keys 1–6 select the operator, 7–32 the parameter page; turn SENS to change the value',
+    );
+  }
+
+  function leaveEditMode(): void {
+    if (!editMode) {
+      return;
+    }
+    editMode = false;
+    refreshBankControls();
+    refreshPrograms();
+    refreshEntryKnob();
   }
 
   function freshCurrentBank(): Bank {
@@ -626,6 +878,21 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
           ? 'confirm or cancel the bank deletion'
           : 'delete bank',
     );
+    okButton.title = storeMode
+      ? 'Press OK to confirm the store'
+      : deleteMode
+        ? 'Press OK to confirm the deletion'
+        : editMode
+          ? 'Leave edit mode'
+          : 'Edit the current voice';
+    okButton.setAttribute(
+      'aria-label',
+      storeMode || deleteMode
+        ? 'confirm'
+        : editMode
+          ? 'leave edit mode'
+          : 'edit voice',
+    );
   }
 
   function refreshPrograms(): void {
@@ -635,7 +902,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
       const voice = bank.voices[slot];
       programKeys[slot]?.toggleAttribute(
         'hidden',
-        !storeMode && voice === undefined,
+        !storeMode && !editMode && voice === undefined,
       );
       if (storeMode) {
         // Every internal memory position is offered, not only the ones the
@@ -643,6 +910,17 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
         button.disabled = false;
         button.title = `internal memory position ${slot + 1}`;
         button.setAttribute('aria-label', `internal memory position ${slot + 1}`);
+      } else if (editMode) {
+        const legend = PROGRAM_KEY_LABELS[slot] ?? '';
+        button.disabled = false;
+        button.title =
+          slot < 6 ? `${legend}: tap to toggle, hold to select` : legend;
+        button.setAttribute(
+          'aria-label',
+          slot < 6
+            ? `operator ${slot + 1} on/off, hold to select it for editing`
+            : `edit ${legend}`,
+        );
       } else {
         button.disabled = voice === undefined;
         button.title = voice === undefined ? '' : voice.name;
@@ -654,11 +932,14 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
         );
       }
       button.textContent = String(slot + 1);
-      button.classList.toggle('selected', !storeMode && slot === program);
+      const selected = editMode
+        ? slot + 1 === activeEditKey
+        : slot === program;
+      button.classList.toggle('selected', !storeMode && selected);
       button.classList.toggle('store-target', storeMode && slot === storeTarget);
       button.setAttribute(
         'aria-pressed',
-        storeMode ? String(slot === storeTarget) : String(slot === program),
+        storeMode ? String(slot === storeTarget) : String(selected),
       );
     });
 
@@ -689,6 +970,13 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
       ? 'Normalize the DX7S output gain to the DX7 level'
       : 'Output gain normalization is a DX7S feature';
     normalizeButton.classList.toggle('lit', available && normalizeOutput);
+    renderPatchDetails();
+    if (editMode) {
+      const view = currentEditView();
+      lcdLineOne = view?.lineOne ?? 'ALG';
+      display.setLines(lcdLineOne, view?.lineTwo ?? '');
+      return;
+    }
     const bank = currentBank();
     const voice = currentVoice();
     const cartridge = bank.builtin !== true;
@@ -708,6 +996,10 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
           ? LCD_MEMORY_STORE
           : `${prefix}${digits} ${name} ENG ${personality}`,
     );
+  }
+
+  function renderPatchDetails(): void {
+    const voice = currentVoice();
     display.setPatchDetails(
       voice === null
         ? null
@@ -742,12 +1034,16 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     if (slot < 0 || slot >= bank.voices.length) {
       return;
     }
+    editMode = false;
+    editBuffer = null;
     program = slot;
     const voice = bank.voices[program];
     if (voice !== undefined) {
-      engine.setVoice(voice.data, voice.extensions);
+      sendVoice(voice);
     }
+    refreshBankControls();
     refreshPrograms();
+    refreshEntryKnob();
   }
 
   function selectBank(id: string): void {
@@ -791,6 +1087,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
       showError('There is no voice to store');
       return;
     }
+    leaveEditMode();
     storeMode = true;
     storeTarget = program;
     refreshBankControls();
@@ -843,6 +1140,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     if (bank.builtin === true || banks.length <= 1) {
       return;
     }
+    leaveEditMode();
     deleteMode = true;
     refreshBankControls();
     renderPatchInfo();
@@ -904,10 +1202,9 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
       0,
       Math.min(MAX_SENSITIVITY, Math.round(percent)),
     );
-    const angle = -135 + (sensitivity / MAX_SENSITIVITY) * 270;
-    sensitivityKnob.dial.style.setProperty('--knob-angle', `${angle}deg`);
-    sensitivityKnob.element.setAttribute('aria-valuenow', String(sensitivity));
-    sensitivityKnob.element.setAttribute('aria-valuetext', `${sensitivity}%`);
+    if (!editMode) {
+      refreshEntryKnob();
+    }
     scheduleSettingsSave({ sensitivity });
   }
 
@@ -1220,7 +1517,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
       setVolume((value / 127) * MAX_VOLUME);
     },
     onSensitivity: (value) => {
-      setSensitivity((value / 127) * MAX_SENSITIVITY);
+      setEntryKnobValue((value / 127) * entryKnobMax());
     },
     onSustain: (on) => {
       engine.setSustain(on);
@@ -1320,7 +1617,15 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
       confirmDelete();
       return;
     }
-    confirmStore();
+    if (storeMode) {
+      confirmStore();
+      return;
+    }
+    if (editMode) {
+      leaveEditMode();
+      return;
+    }
+    enterEditMode();
   });
   removeButton.addEventListener('click', () => {
     if (storeMode) {
@@ -1399,7 +1704,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   const initialBank = freshCurrentBank();
   const initial = initialBank.voices[program] ?? null;
   if (initial !== null) {
-    engine.setVoice(initial.data, initial.extensions);
+    sendVoice(initial);
   }
 
   engine.onReady((version, _dumpSize, readyEngineType) => {
@@ -1409,7 +1714,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     engine.configureMidiControllers();
     const voice = currentVoice();
     if (voice !== null) {
-      engine.setVoice(voice.data, voice.extensions);
+      sendVoice(voice);
     }
   });
 
