@@ -234,6 +234,8 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   let normalizeOutput = savedSettings.normalize === true;
   let editMode = false;
   let editBuffer: Voice | null = null;
+  /** The name the edited voice had when the edit session started. */
+  let editBaseName = '';
   let selectedOperator = 5;
   let selectedPage: number | null = null;
   let activeEditKey = 7;
@@ -299,7 +301,21 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   programNextButton.setAttribute('aria-label', 'next program');
   programNextButton.textContent = '+';
 
-  programButtonsWrap.append(programPrevButton, programLabel, programNextButton);
+  const programNavGroup = document.createElement('div');
+  programNavGroup.className = 'program-nav-group';
+
+  const programSub = document.createElement('span');
+  programSub.className = 'button-label-sublabel program-nav-sublabel';
+  programSub.textContent = 'VALUE';
+
+  programNavGroup.append(
+    programPrevButton,
+    programLabel,
+    programNextButton,
+    programSub,
+  );
+
+  programButtonsWrap.append(programNavGroup);
 
   const bankButtonsWrap = document.createElement('div');
   bankButtonsWrap.className = 'program-buttons-group bank-buttons-group';
@@ -832,6 +848,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
         extensions:
           voice.extensions === undefined ? undefined : { ...voice.extensions },
       };
+      editBaseName = voice.name;
     }
     editMode = true;
     if (selectedPage === null) {
@@ -841,7 +858,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     refreshPrograms();
     refreshEntryKnob();
     showNotice(
-      'Edit mode: keys 1–6 select the operator, 7–32 the parameter page; turn SENS to change the value',
+      'Edit mode: keys 1–6 select the operator, 7–32 the parameter page; turn SENS or press PRG +/- to change the value',
     );
   }
 
@@ -976,8 +993,28 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
       : 'Store the voice in the internal memory';
     cancelLcdFlash();
     renderPatchInfo();
-    programPrevButton.disabled = !storeMode && bank.voices.length < 2;
-    programNextButton.disabled = !storeMode && bank.voices.length < 2;
+    programPrevButton.disabled =
+      !storeMode && !editMode && bank.voices.length < 2;
+    programNextButton.disabled =
+      !storeMode && !editMode && bank.voices.length < 2;
+    // In edit mode the PRG buttons are the value entry; on the name page
+    // they move the cursor instead.
+    const navLabelBack =
+      editMode && selectedPage === 32
+        ? 'move the name cursor back'
+        : editMode
+          ? 'decrement the value'
+          : 'previous program';
+    const navLabelForward =
+      editMode && selectedPage === 32
+        ? 'move the name cursor forward'
+        : editMode
+          ? 'increment the value'
+          : 'next program';
+    programPrevButton.title = navLabelBack;
+    programPrevButton.setAttribute('aria-label', navLabelBack);
+    programNextButton.title = navLabelForward;
+    programNextButton.setAttribute('aria-label', navLabelForward);
   }
 
   /**
@@ -1011,13 +1048,19 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     if (editMode) {
       const bank = currentBank();
       const prefix = bank.builtin !== true ? 'CRT' : 'INT';
-      const name = (currentVoice()?.name ?? '').slice(0, 10);
+      // The details line keeps the name of the patch as it was when the
+      // edit started; the edit buffer's name lives on the LCD's name line.
+      const name = editBaseName.slice(0, 10);
       display.setDetailText(
         `EDIT ${prefix} ${program + 1} ${name}`.trimEnd(),
       );
       const view = currentEditView();
       lcdLineOne = view?.lineOne ?? 'ALG';
-      display.setLines(lcdLineOne, view?.lineTwo ?? '');
+      display.setLines(
+        lcdLineOne,
+        view?.lineTwo ?? '',
+        view?.cursorColumn ?? undefined,
+      );
       return;
     }
     renderPatchDetails();
@@ -1121,6 +1164,28 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     refreshPrograms();
     refreshEntryKnob();
     showNotice(`Selected OP${6 - selectedOperator}`);
+  }
+
+  /**
+   * The PRG buttons in edit mode: the value being edited steps up or down,
+   * unless the name is being edited, where they move the cursor across the
+   * ten-character name field, final spaces included.
+   */
+  function stepEditValue(delta: number): void {
+    const view = currentEditView();
+    if (view === null) {
+      return;
+    }
+    if (view.kind === 'name') {
+      nameCursor = Math.max(
+        0,
+        Math.min(VOICE_NAME_LENGTH - 1, nameCursor + delta),
+      );
+      refreshPrograms();
+      refreshEntryKnob();
+      return;
+    }
+    applyEditValue(view.value + delta);
   }
 
   /**
@@ -1710,6 +1775,10 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
       refreshPrograms();
       return;
     }
+    if (editMode) {
+      stepEditValue(-1);
+      return;
+    }
     const bank = currentBank();
     selectProgram((program - 1 + bank.voices.length) % bank.voices.length);
   });
@@ -1721,6 +1790,10 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
       const length = starter.voices.length;
       storeTarget = (storeTarget + 1) % length;
       refreshPrograms();
+      return;
+    }
+    if (editMode) {
+      stepEditValue(1);
       return;
     }
     const bank = currentBank();

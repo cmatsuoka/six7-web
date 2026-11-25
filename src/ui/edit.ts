@@ -18,6 +18,8 @@ export interface EditView {
   readonly value: number;
   readonly lineOne: string;
   readonly lineTwo: string;
+  /** The column of the name cursor inside lineTwo; null when there is none. */
+  readonly cursorColumn: number | null;
   readonly valueText: string;
 }
 
@@ -97,6 +99,7 @@ const PARAMS: Readonly<Record<number, ParamDef>> = {
   31: { max: 48, scope: () => 'patch', offset: () => 144 },
 };
 
+const NAME_LINE_PREFIX = 'NAME= ';
 const WAVEFORMS = ['TRIANGL', 'SAW DWN', 'SAW UP', 'SQUARE', 'SINE', 'S/HOLD'];
 const CURVES = ['-LIN', '-EXP', '+EXP', '+LIN'];
 
@@ -123,7 +126,7 @@ export function createEditView(
     const before = name.slice(0, cursor);
     const current = name[cursor] ?? ' ';
     const after = name.slice(cursor + 1);
-    const lineTwo = `NAME= ${before}[${current}]${after}`;
+    const lineTwo = `${NAME_LINE_PREFIX}${before}${current}${after}`;
     return {
       button,
       sub: 0,
@@ -133,6 +136,7 @@ export function createEditView(
       value: code - NAME_CHAR_MIN,
       lineOne: algorithmLine(data, operatorIndex, false),
       lineTwo,
+      cursorColumn: NAME_LINE_PREFIX.length + cursor,
       valueText: lineTwo,
     };
   }
@@ -160,6 +164,7 @@ export function createEditView(
     value,
     lineOne,
     lineTwo,
+    cursorColumn: null,
     valueText: lineTwo,
   };
 }

@@ -43,6 +43,8 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 
 const WIDE_LINE_COLUMNS = 48;
 const SECOND_LINE_COLUMNS = 30;
+/** Keep in step with the .lcd-cursor animation's duration. */
+const CURSOR_BLINK_SECONDS = 1;
 
 export interface PatchDetails {
   /** The voice's algorithm, 1..32 as the panel numbers it. */
@@ -65,8 +67,13 @@ export interface Display {
   setProgram(program: number | null): void;
   /** Blink the program digits a number of times. */
   blinkProgram(times: number): void;
-  /** Set both LCD lines; the second is padded to its full width. */
-  setLines(first: string, second: string): void;
+  /**
+   * Set both LCD lines; the second is padded to its full width. When
+   * cursorColumn is given, the character at that column of the second line
+   * carries the LCD's blinking block cursor; a changed character restarts
+   * the blink at its block-hidden half.
+   */
+  setLines(first: string, second: string, cursorColumn?: number): void;
   /** Show the current voice's algorithm, PEG depth and key mode. */
   setPatchDetails(details: PatchDetails | null): void;
   /** Set arbitrary text on the detail line. */
@@ -121,6 +128,16 @@ export function createDisplay(): Display {
 
   element.append(led, lcdShell);
 
+  /**
+   * The blink phase of the name cursor. The cursor cell is rebuilt at
+   * every render, so the phase is anchored to the wall clock: the cell's
+   * animation delay places it back where the cycle was, and a changed
+   * character snaps the phase to the block-hidden half so the change is
+   * seen before the block returns.
+   */
+  let cursorAnchor: number | null = null;
+  let cursorChar: string | null = null;
+
   return {
     element,
     algorithmHost,
@@ -155,18 +172,33 @@ export function createDisplay(): Display {
       digits.style.animationIterationCount = String(count);
       digits.classList.add('blinking');
     },
-    setLines(first: string, second: string): void {
-      lineOne.textContent = fitLine(first, WIDE_LINE_COLUMNS);
-      lineTwo.textContent = fitLine(second, SECOND_LINE_COLUMNS);
+    setLines(first: string, second: string, cursorColumn?: number): void {
+      const fitted = fitLine(second, SECOND_LINE_COLUMNS);
+      renderCells(lineOne, fitLine(first, WIDE_LINE_COLUMNS));
+      const char =
+        cursorColumn === undefined ? null : (fitted[cursorColumn] ?? ' ');
+      if (char === null) {
+        cursorAnchor = null;
+        cursorChar = null;
+      } else if (cursorChar === null || char !== cursorChar) {
+        cursorAnchor = performance.now();
+        cursorChar = char;
+      }
+      const cell = renderCells(lineTwo, fitted, cursorColumn);
+      if (cell !== null && cursorAnchor !== null) {
+        const phase =
+          ((performance.now() - cursorAnchor) / CURSOR_BLINK_SECONDS + 0.5) %
+          1;
+        cell.style.animationDelay = `${-Math.round(phase * CURSOR_BLINK_SECONDS * 1000)}ms`;
+      }
       updateAria();
     },
     setPatchDetails(details: PatchDetails | null): void {
-      detail.textContent =
-        details === null ? '' : formatPatchDetails(details);
+      renderCells(detail, details === null ? '' : formatPatchDetails(details));
       updateAria();
     },
     setDetailText(text: string): void {
-      detail.textContent = text;
+      renderCells(detail, text);
       updateAria();
     },
   };
@@ -262,4 +294,31 @@ function isUnison(keyMode: number): boolean {
 function fitLine(text: string, columns: number): string {
   const clean = text.replace(/[\r\n\t]/g, ' ');
   return clean.padEnd(columns, ' ').slice(0, columns);
+}
+
+/**
+ * One fixed-width cell per character, so the character grid holds its
+ * positions no matter which glyph a cell shows — the hardware's LCD has
+ * uniform cells, and a proportional font's advances would move them.
+ * Returns the cursor cell, if one was rendered.
+ */
+function renderCells(
+  target: HTMLElement,
+  text: string,
+  cursorColumn?: number,
+): HTMLSpanElement | null {
+  const cells: HTMLSpanElement[] = [];
+  let cursorCell: HTMLSpanElement | null = null;
+  for (let index = 0; index < text.length; index += 1) {
+    const cell = document.createElement('span');
+    cell.className = 'lcd-cell';
+    if (index === cursorColumn) {
+      cell.classList.add('lcd-cursor');
+      cursorCell = cell;
+    }
+    cell.textContent = text[index] ?? ' ';
+    cells.push(cell);
+  }
+  target.replaceChildren(...cells);
+  return cursorCell;
 }

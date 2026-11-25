@@ -355,7 +355,8 @@ body {
   white-space: nowrap;
 }
 
-.bank-nav-sublabel {
+.bank-nav-sublabel,
+.program-nav-sublabel {
   color: #7fa9d0;
 }
 
@@ -479,6 +480,53 @@ body {
   letter-spacing: 0.13em;
   white-space: pre;
   text-shadow: 0 0 5px rgba(35, 70, 12, 0.24);
+}
+
+/* Uniform character cells: every glyph sits in a cell of constant pitch
+   (the old advance tracking is absorbed into the cell width), so the grid
+   does not move when a cell's character changes. */
+.lcd-cell {
+  display: inline-block;
+  letter-spacing: 0;
+  text-align: left;
+  vertical-align: baseline;
+}
+
+.lcd-line .lcd-cell {
+  width: calc(1ch + 0.13em);
+}
+
+.lcd-detail .lcd-cell {
+  width: calc(1ch + 0.08em);
+}
+
+/* The name editor's block cursor: a solid ink block that blinks on and off,
+   one pixel column of the font narrower than the character cell. */
+.lcd-cursor {
+  animation: lcd-cursor-blink 1s steps(1, end) infinite;
+}
+
+@keyframes lcd-cursor-blink {
+  0% {
+    background-image: linear-gradient(
+      to right,
+      var(--lcd-ink) calc(100% - 0.1em),
+      transparent calc(100% - 0.1em)
+    );
+    color: transparent;
+  }
+  50% {
+    background-image: none;
+    color: var(--lcd-ink);
+  }
+  100% {
+    background-image: linear-gradient(
+      to right,
+      var(--lcd-ink) calc(100% - 0.1em),
+      transparent calc(100% - 0.1em)
+    );
+    color: transparent;
+  }
 }
 
 .lcd-detail {
@@ -683,7 +731,8 @@ body {
   margin-top: 7px;
 }
 
-.bank-nav-group {
+.bank-nav-group,
+.program-nav-group {
   position: relative;
   display: flex;
   align-items: center;
