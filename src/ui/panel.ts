@@ -593,7 +593,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   programGrid.addEventListener(
     'wheel',
     (event) => {
-      if (storeMode || editMode || event.deltaY === 0) {
+      if (storeMode || event.deltaY === 0) {
         return;
       }
       event.preventDefault();
@@ -602,11 +602,15 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
         return;
       }
       lastWheelStep = now;
+      const delta = event.deltaY > 0 ? 1 : -1;
+      if (editMode) {
+        stepEditValue(delta);
+        return;
+      }
       const bank = currentBank();
       if (bank.voices.length < 2) {
         return;
       }
-      const delta = event.deltaY > 0 ? 1 : -1;
       selectProgram((program + delta + bank.voices.length) % bank.voices.length);
     },
     { passive: false },
@@ -637,17 +641,23 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   octaveUp.textContent = '+';
   octaveUp.setAttribute('aria-label', 'octave up');
 
-  keyboardHead.append(keyboardTitle, octaveDown, octaveLabel, octaveUp);
+  const status = document.createElement('div');
+  status.className = 'status keyboard-status';
+  status.setAttribute('role', 'status');
+  status.setAttribute('aria-live', 'polite');
+
+  keyboardHead.append(
+    keyboardTitle,
+    octaveDown,
+    octaveLabel,
+    octaveUp,
+    status,
+  );
 
   const piano = document.createElement('div');
   piano.className = 'piano';
 
   keyboardPanel.append(keyboardHead, piano);
-
-  const status = document.createElement('div');
-  status.className = 'status';
-  status.setAttribute('role', 'status');
-  status.setAttribute('aria-live', 'polite');
 
   const attribution = document.createElement('div');
   attribution.className = 'attribution';
@@ -658,7 +668,6 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     midiRow,
     programGrid,
     keyboardPanel,
-    status,
   );
 
   const caseBottom = document.createElement('div');
@@ -869,7 +878,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
     refreshPrograms();
     refreshEntryKnob();
     showNotice(
-      'Edit mode: keys 1–6 select the operator, 7–32 the parameter page; turn SENS or press PRG +/- to change the value',
+      'Edit mode: keys 1–6 select the operator, 7–32 the parameter page; turn SENS, scroll or press PRG +/- to change the value',
     );
   }
 
@@ -946,7 +955,6 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
 
   function refreshPrograms(): void {
     const bank = currentBank();
-    programGrid.classList.toggle('store-mode', storeMode);
     programButtons.forEach((button, slot) => {
       const voice = bank.voices[slot];
       programKeys[slot]?.toggleAttribute(

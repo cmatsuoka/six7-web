@@ -889,10 +889,6 @@ body {
   text-overflow: ellipsis;
 }
 
-.program-grid.store-mode .program-key-label {
-  visibility: hidden;
-}
-
 .program-key .program-button {
   width: 100%;
 }
@@ -1031,6 +1027,15 @@ body {
 
 .status[data-kind="notice"] {
   color: #cfd8a4;
+}
+
+.keyboard-status {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  margin-left: 10px;
+  text-align: left;
+  line-height: 1.2;
 }
 
 .attribution {
