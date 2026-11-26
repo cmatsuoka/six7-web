@@ -202,7 +202,7 @@ function algorithmLine(
 function formatLineTwo(button: number, sub: number, value: number): string {
   switch (button) {
     case 7:
-      return `ALGORITHM SELECT ${value + 1}`;
+      return `ALGORITHM SELECT`;
     case 8:
       return `FEEDBACK ${value}`;
     case 9:
