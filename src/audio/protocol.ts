@@ -26,6 +26,13 @@ export const VOICE_NAME_LENGTH = 10;
 /** The algorithm in the voice dump's global block, 0..31. */
 export const VOICE_ALGORITHM_OFFSET = 134;
 
+/** The LFO parameters in the voice dump's global block. */
+export const VOICE_LFO_SPEED_OFFSET = 137;
+export const VOICE_LFO_DELAY_OFFSET = 138;
+export const VOICE_LFO_PMD_OFFSET = 139;
+export const VOICE_LFO_AMD_OFFSET = 140;
+export const VOICE_LFO_WAVE_OFFSET = 142;
+
 /** How many voices a canonical 32-voice bank holds. */
 export const BANK_VOICE_COUNT = 32;
 

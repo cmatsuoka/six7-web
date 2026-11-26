@@ -59,10 +59,10 @@ export interface PatchDetails {
 
 export interface Display {
   readonly element: HTMLElement;
-  /** The right-hand part of the LCD, where the algorithm chart is drawn. */
-  readonly algorithmHost: HTMLElement;
-  /** Reserve the LCD's right side for the algorithm chart. */
-  setAlgorithmOpen(open: boolean): void;
+  /** The right-hand part of the LCD, where a diagram is drawn. */
+  readonly diagramHost: HTMLElement;
+  /** Reserve the LCD's right side for a diagram. */
+  setDiagramOpen(open: boolean): void;
   /** Show a 1-based program number, or blank both digits. */
   setProgram(program: number | null): void;
   /** Blink the program digits a number of times. */
@@ -120,10 +120,10 @@ export function createDisplay(): Display {
   const detail = document.createElement('div');
   detail.className = 'lcd-detail';
 
-  const algorithmHost = document.createElement('div');
-  algorithmHost.className = 'lcd-algorithm';
+  const diagramHost = document.createElement('div');
+  diagramHost.className = 'lcd-diagram';
 
-  lcd.append(lineOne, lineTwo, detail, algorithmHost);
+  lcd.append(lineOne, lineTwo, detail, diagramHost);
   lcdShell.append(lcd);
 
   element.append(led, lcdShell);
@@ -140,9 +140,9 @@ export function createDisplay(): Display {
 
   return {
     element,
-    algorithmHost,
-    setAlgorithmOpen(open: boolean): void {
-      lcd.classList.toggle('has-algorithm', open);
+    diagramHost,
+    setDiagramOpen(open: boolean): void {
+      lcd.classList.toggle('has-diagram', open);
     },
     setProgram(program: number | null): void {
       if (program === null || !Number.isFinite(program)) {

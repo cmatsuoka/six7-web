@@ -1,5 +1,10 @@
 import {
   VOICE_ALGORITHM_OFFSET,
+  VOICE_LFO_AMD_OFFSET,
+  VOICE_LFO_DELAY_OFFSET,
+  VOICE_LFO_PMD_OFFSET,
+  VOICE_LFO_SPEED_OFFSET,
+  VOICE_LFO_WAVE_OFFSET,
   VOICE_NAME_LENGTH,
   VOICE_NAME_OFFSET,
 } from '../audio/protocol';
@@ -39,11 +44,11 @@ const NAME_CHAR_COUNT = NAME_CHAR_MAX - NAME_CHAR_MIN + 1;
 const PARAMS: Readonly<Record<number, ParamDef>> = {
   7: { max: 31, scope: () => 'patch', offset: () => 134 },
   8: { max: 7, scope: () => 'patch', offset: () => 135 },
-  9: { max: 5, scope: () => 'patch', offset: () => 142 },
-  10: { max: 99, scope: () => 'patch', offset: () => 137 },
-  11: { max: 99, scope: () => 'patch', offset: () => 138 },
-  12: { max: 99, scope: () => 'patch', offset: () => 139 },
-  13: { max: 99, scope: () => 'patch', offset: () => 140 },
+  9: { max: 5, scope: () => 'patch', offset: () => VOICE_LFO_WAVE_OFFSET },
+  10: { max: 99, scope: () => 'patch', offset: () => VOICE_LFO_SPEED_OFFSET },
+  11: { max: 99, scope: () => 'patch', offset: () => VOICE_LFO_DELAY_OFFSET },
+  12: { max: 99, scope: () => 'patch', offset: () => VOICE_LFO_PMD_OFFSET },
+  13: { max: 99, scope: () => 'patch', offset: () => VOICE_LFO_AMD_OFFSET },
   14: { max: 1, scope: () => 'patch', offset: () => 141 },
   15: { max: 7, scope: () => 'patch', offset: () => 143 },
   16: { max: 3, scope: () => 'operator', offset: () => 14 },
@@ -201,7 +206,7 @@ function formatLineTwo(button: number, sub: number, value: number): string {
     case 8:
       return `FEEDBACK ${value}`;
     case 9:
-      return `LFO WAVE= ${WAVEFORMS[value] ?? ''}`;
+      return `LFO WAVE=${WAVEFORMS[value] ?? ''}`;
     case 10:
       return `LFO SPEED ${value}`;
     case 11:

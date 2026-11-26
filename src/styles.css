@@ -179,8 +179,9 @@ body {
     0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-/* The algorithm chart is drawn on the right side of the LCD field. */
-.lcd-algorithm {
+/* The algorithm chart or the LFO waveform is drawn on the right side of
+   the LCD field. */
+.lcd-diagram {
   position: absolute;
   top: 5px;
   right: 9px;
@@ -193,7 +194,13 @@ body {
   pointer-events: none;
 }
 
-.algorithm-diagram {
+/* The LFO illustration reaches a little wider than the algorithm chart. */
+.lcd-diagram:has(.lfo-waveform:not([hidden])) {
+  width: 46%;
+}
+
+.algorithm-diagram,
+.lfo-waveform {
   display: flex;
   width: 100%;
   height: 100%;
@@ -201,23 +208,30 @@ body {
   justify-content: center;
 }
 
-.algorithm-diagram[hidden] {
+.algorithm-diagram[hidden],
+.lfo-waveform[hidden] {
   display: none;
 }
 
-.algorithm-diagram svg {
+.algorithm-diagram svg,
+.lfo-waveform svg {
   display: block;
   width: 100%;
   height: 100%;
 }
 
-.lcd.has-algorithm .lcd-line {
+.lcd.has-diagram .lcd-line {
   padding-right: 45%;
   overflow: hidden;
 }
 
-.lcd.has-algorithm .lcd-detail {
+.lcd.has-diagram .lcd-detail {
   padding-right: 45%;
+}
+
+.lcd.has-diagram:has(.lfo-waveform:not([hidden])) .lcd-line,
+.lcd.has-diagram:has(.lfo-waveform:not([hidden])) .lcd-detail {
+  padding-right: 48%;
 }
 
 .algorithm-edge,
@@ -249,6 +263,22 @@ body {
   font-family: "Register", "Courier New", Courier, ui-monospace, monospace;
   font-size: 10px;
   font-weight: 700;
+}
+
+/* The LFO illustration: the amplitude-modulation wave in the display's ink
+   and the pitch-modulation wave slightly lighter, over it.  The wave is a
+   staircase on a coarse grid, drawn with crisp edges so it reads as pixels. */
+.lfo-wave {
+  fill: none;
+  stroke: var(--lcd-ink);
+  stroke-width: 1.2;
+  #stroke-linecap: square;
+  #stroke-linejoin: miter;
+  #shape-rendering: crispEdges;
+}
+
+.lfo-pitch {
+  opacity: 0.50;
 }
 
 .display-buttons {

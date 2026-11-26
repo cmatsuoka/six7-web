@@ -29,6 +29,7 @@ import {
 import { createAlgorithmDiagram } from './algorithm-diagram';
 import { createDisplay } from './display';
 import { createEditView, editSubGroup, type EditView } from './edit';
+import { createLfoWaveform, lfoFocusForButton } from './lfo-waveform';
 import { MidiInput, type MidiDevice } from '../audio/midi';
 import { parseSysex, voiceAlgorithm, voiceName } from './sysex';
 import { loadBanks, saveBanks, loadInternalMemory, saveInternalMemory, loadSettings, saveSettings, scheduleSettingsSave, cancelSettingsSave } from './storage';
@@ -250,7 +251,8 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
 
   const display = createDisplay();
   const algorithmDiagram = createAlgorithmDiagram();
-  display.algorithmHost.append(algorithmDiagram.element);
+  const lfoWaveform = createLfoWaveform();
+  display.diagramHost.append(algorithmDiagram.element, lfoWaveform.element);
 
   const machine = document.createElement('section');
   machine.className = 'machine';
@@ -1018,19 +1020,34 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
   }
 
   /**
-   * The topology chart belongs to the algorithm-selection page only; the
-   * other edit pages leave the space to the LCD.
+   * The display's right side holds the topology chart on the
+   * algorithm-selection page and the LFO illustration on the LFO pages;
+   * the other edit pages leave the space to the LCD.
    */
-  function updateAlgorithmDiagram(): void {
-    if (!editMode || selectedPage !== 7 || editBuffer === null) {
+  function updateDisplayDiagram(): void {
+    if (!editMode || editBuffer === null || selectedPage === null) {
       algorithmDiagram.setAlgorithm(null);
-      display.setAlgorithmOpen(false);
+      lfoWaveform.setWaveform(null);
+      display.setDiagramOpen(false);
       return;
     }
-    const visible = algorithmDiagram.setAlgorithm(
-      voiceAlgorithm(editBuffer.data),
-    );
-    display.setAlgorithmOpen(visible);
+    if (selectedPage === 7) {
+      lfoWaveform.setWaveform(null);
+      const visible = algorithmDiagram.setAlgorithm(
+        voiceAlgorithm(editBuffer.data),
+      );
+      display.setDiagramOpen(visible);
+      return;
+    }
+    const focus = lfoFocusForButton(selectedPage);
+    algorithmDiagram.setAlgorithm(null);
+    if (focus === null) {
+      lfoWaveform.setWaveform(null);
+      display.setDiagramOpen(false);
+      return;
+    }
+    const visible = lfoWaveform.setWaveform(editBuffer.data);
+    display.setDiagramOpen(visible);
   }
 
   /**
@@ -1038,7 +1055,7 @@ export function createPanel(root: HTMLElement, engine: Six7Engine): Panel {
    * number, ten-character patch name and engine personality on the second.
    */
   function renderPatchInfo(): void {
-    updateAlgorithmDiagram();
+    updateDisplayDiagram();
     const available = engineType === ENGINE_DX7S;
     normalizeButton.disabled = !available;
     normalizeButton.title = available
