@@ -33,6 +33,10 @@ export const VOICE_LFO_PMD_OFFSET = 139;
 export const VOICE_LFO_AMD_OFFSET = 140;
 export const VOICE_LFO_WAVE_OFFSET = 142;
 
+/** The patch pitch envelope's rates and levels in the global block. */
+export const VOICE_PEG_RATE_OFFSET = 126;
+export const VOICE_PEG_LEVEL_OFFSET = 130;
+
 /** How many voices a canonical 32-voice bank holds. */
 export const BANK_VOICE_COUNT = 32;
 

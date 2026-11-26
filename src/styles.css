@@ -194,13 +194,16 @@ body {
   pointer-events: none;
 }
 
-/* The LFO illustration reaches a little wider than the algorithm chart. */
-.lcd-diagram:has(.lfo-waveform:not([hidden])) {
+/* The LFO and envelope illustrations reach a little wider than the
+   algorithm chart. */
+.lcd-diagram:has(.lfo-waveform:not([hidden])),
+.lcd-diagram:has(.envelope-diagram:not([hidden])) {
   width: 46%;
 }
 
 .algorithm-diagram,
-.lfo-waveform {
+.lfo-waveform,
+.envelope-diagram {
   display: flex;
   width: 100%;
   height: 100%;
@@ -209,12 +212,14 @@ body {
 }
 
 .algorithm-diagram[hidden],
-.lfo-waveform[hidden] {
+.lfo-waveform[hidden],
+.envelope-diagram[hidden] {
   display: none;
 }
 
 .algorithm-diagram svg,
-.lfo-waveform svg {
+.lfo-waveform svg,
+.envelope-diagram svg {
   display: block;
   width: 100%;
   height: 100%;
@@ -230,7 +235,9 @@ body {
 }
 
 .lcd.has-diagram:has(.lfo-waveform:not([hidden])) .lcd-line,
-.lcd.has-diagram:has(.lfo-waveform:not([hidden])) .lcd-detail {
+.lcd.has-diagram:has(.lfo-waveform:not([hidden])) .lcd-detail,
+.lcd.has-diagram:has(.envelope-diagram:not([hidden])) .lcd-line,
+.lcd.has-diagram:has(.envelope-diagram:not([hidden])) .lcd-detail {
   padding-right: 48%;
 }
 
@@ -279,6 +286,28 @@ body {
 
 .lfo-pitch {
   opacity: 0.50;
+}
+
+/* The envelope illustration is drawn on the same coarse grid as the LFO
+   wave, in the display's ink. */
+.envelope-curve {
+  fill: none;
+  stroke: var(--lcd-ink);
+  stroke-width: 1.5;
+  opacity: 0.85;
+}
+
+.envelope-reference {
+  stroke: var(--lcd-ink);
+  stroke-width: 1;
+  opacity: 0.25;
+}
+
+.envelope-release {
+  stroke: var(--lcd-ink);
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+  opacity: 0.5;
 }
 
 .display-buttons {
